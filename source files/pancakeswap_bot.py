@@ -320,7 +320,7 @@ class Worker(QObject):
                         for token_number, eth_address, high, low, activate, stoploss_value, stoploss_activate, trade_with_ERC, trade_with_ETH, fast_token, small_case_name, decimals, balance, price, dollar_balance in all_token_information:
                             if str(eth_address) != '0' or '':
                                 token1eth = uniswap_wrapper.get_eth_token_input_price(w33.toChecksumAddress(eth_address),
-                                                                                      100)
+                                                                                      10000000)
                                 if decimals != 18:
                                     pricetoken1usd = (priceeth / (token1eth)) / (
                                             10 ** (18 - (decimals)))
@@ -335,7 +335,7 @@ class Worker(QObject):
                         for token_number, eth_address, high, low, activate, stoploss_value, stoploss_activate, trade_with_ERC, trade_with_ETH, fast_token, small_case_name, decimals, balance in all_token_information:
                             if str(eth_address) != '0' or '':
                                     token1eth = uniswap_wrapper.get_eth_token_input_price(w33.toChecksumAddress(eth_address),
-                                                                                          100)
+                                                                                          10000000)
                                     if decimals != 18:
                                         pricetoken1usd = (priceeth / (token1eth)) / (
                                                 10 ** (18 - (decimals)))
