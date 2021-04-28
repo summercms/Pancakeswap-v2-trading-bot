@@ -342,6 +342,8 @@ class Worker(QObject):
                                 token1eth = uniswap_wrapper.get_eth_token_input_price(
                                     w33.toChecksumAddress(eth_address),
                                     10000000000000)
+                                token1eth = uniswap_wrapper.get_eth_token_input_price(w33.toChecksumAddress(eth_address),
+                                                                                      10000000)
                                 if decimals != 18:
                                     pricetoken1usd = (priceeth / (token1eth)) / (10 ** (18 - (decimals)))
                                 else:
@@ -362,6 +364,8 @@ class Worker(QObject):
                                     token1eth = uniswap_wrapper.get_eth_token_input_price(
                                         w33.toChecksumAddress(eth_address),
                                         10000000000000)
+                                    token1eth = uniswap_wrapper.get_eth_token_input_price(w33.toChecksumAddress(eth_address),
+                                                                                          10000000)
                                     if decimals != 18:
                                         pricetoken1usd = (priceeth / (token1eth)) / (10 ** (18 - (decimals)))
                                     else:
