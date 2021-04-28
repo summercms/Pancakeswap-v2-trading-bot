@@ -1,11 +1,11 @@
 #!python
-#cython: language_level=3
+# cython: language_level=3
 import datetime
 from itertools import permutations
 import time
 from swap import Uniswap
 from web3 import Web3, middleware, _utils
-from web3.gas_strategies.time_based import fast_gas_price_strategy,glacial_gas_price_strategy
+from web3.gas_strategies.time_based import fast_gas_price_strategy, glacial_gas_price_strategy
 from pycoingecko import CoinGeckoAPI
 import pyetherbalance
 import requests
@@ -15,7 +15,7 @@ import sys
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import QObject, QThread, pyqtSignal, pyqtSlot
 from PyQt5.QtGui import *
-from PyQt5.QtWidgets import QApplication, QPushButton, QTextEdit, QVBoxLayout, QWidget,QGraphicsObject
+from PyQt5.QtWidgets import QApplication, QPushButton, QTextEdit, QVBoxLayout, QWidget, QGraphicsObject
 from PyQt5.QtCore import QCoreApplication
 from PyQt5 import QtTest
 import fileinput
@@ -25,10 +25,11 @@ import os
 from time import localtime, strftime
 from web3 import types
 import traceback
+
 sys.path.insert(0, './')
 import configfile
-
-
+import json
+import requests
 
 sys.setrecursionlimit(1500)
 
@@ -71,15 +72,14 @@ sys.excepthook = trap_exc_during_debug
 
 @pyqtSlot()
 class Worker(QObject):
-
     sig_step = pyqtSignal(int, str)  # worker id, step description: emitted every step through work() loop
     sig_done = pyqtSignal(int)  # worker id: emitted at end of work()
     sig_msg = pyqtSignal(str)  # message to be shown to user
 
     def __init__(self, id: int):
-            super().__init__()
-            self.__id = id
-            self.__abort = False
+        super().__init__()
+        self.__id = id
+        self.__abort = False
 
     def work(self):
         while self.__abort != True:
@@ -87,26 +87,25 @@ class Worker(QObject):
             thread_id = int(QThread.currentThreadId())  # cast to int() is necessary
             self.sig_msg.emit('Running worker #{} from thread "{}" (#{})'.format(self.__id, thread_name, thread_id))
 
-
             if 'step' not in locals():
-                step=1
+                step = 1
             else:
-                step=1
+                step = 1
             self.sig_step.emit(self.__id, 'step ' + str(step))
             QCoreApplication.processEvents()
-            if self.__abort==True:
+            if self.__abort == True:
                 # note that "step" value will not necessarily be same for every thread
                 self.sig_msg.emit('Worker #{} aborting work at step {}'.format(self.__id, step))
 
             importlib.reload(configfile)
             w33 = Web3()
             cg = CoinGeckoAPI()
-            maxgwei=int(configfile.maxgwei)
+            maxgwei = int(configfile.maxgwei)
             if configfile.maxgweinumber == '':
-                maxgweinumber=0
+                maxgweinumber = 0
             else:
                 maxgweinumber = int(configfile.maxgweinumber)
-            diffdeposit=float(configfile.diffdeposit)
+            diffdeposit = float(configfile.diffdeposit)
             diffdepositaddress = str(configfile.diffdepositaddress)
             speed = str(configfile.speed)
             max_slippage = float(configfile.max_slippage)
@@ -117,47 +116,58 @@ class Worker(QObject):
             infura_url = str(configfile.infuraurl)
             infuraurl = infura_url
             tokentokennumerator = float(configfile.tokentokennumerator)
-            mcotoseeassell=float(configfile.mcotoseeassell)
+            mcotoseeassell = float(configfile.mcotoseeassell)
             debugmode = int(configfile.debugmode)
 
 
-            ##for token_number,eth_address,high,low,activate,stoploss_value,stoploss_activate,trade_with_ERC,trade_with_ETH,fast_token in all_token_information:
-            all_token_information= [(1,str(configfile.token1ethaddress),float(configfile.token1high),float(configfile.token1low),
-                                     float(configfile.activatetoken1),float(configfile.token1stoploss),float(configfile.stoplosstoken1)
-                                     ,float(configfile.tradewithERCtoken1),float(configfile.tradewithETHtoken1),'0',str(configfile.token1name),int(configfile.token1decimals)),
-                                    (2,str(configfile.token2ethaddress),float(configfile.token2high),float(configfile.token2low),
-                                     float(configfile.activatetoken2),float(configfile.token2stoploss),float(configfile.stoplosstoken2)
-                                     ,float(configfile.tradewithERCtoken2),float(configfile.tradewithETHtoken2),'0',str(configfile.token2name),int(configfile.token2decimals)),
-                                    (3,str(configfile.token3ethaddress),float(configfile.token3high),float(configfile.token3low),
-                                     float(configfile.activatetoken3),float(configfile.token3stoploss),float(configfile.stoplosstoken3)
-                                     ,float(configfile.tradewithERCtoken3),float(configfile.tradewithETHtoken3),'0',str(configfile.token3name),int(configfile.token3decimals)),
-                                    (4,str(configfile.token4ethaddress),float(configfile.token4high),float(configfile.token4low),
-                                     float(configfile.activatetoken4),float(configfile.token4stoploss),float(configfile.stoplosstoken4)
-                                     ,float(configfile.tradewithERCtoken4),float(configfile.tradewithETHtoken4),'0',str(configfile.token4name),int(configfile.token4decimals)),
-                                    (5,str(configfile.token5ethaddress),float(configfile.token5high),float(configfile.token5low),
-                                     float(configfile.activatetoken5),float(configfile.token5stoploss),float(configfile.stoplosstoken5)
-                                     ,float(configfile.tradewithERCtoken5),float(configfile.tradewithETHtoken5),'0',str(configfile.token5name),int(configfile.token5decimals)),
-                                    (6,str(configfile.token6ethaddress),float(configfile.token6high),float(configfile.token6low),
-                                     float(configfile.activatetoken6),float(configfile.token6stoploss),float(configfile.stoplosstoken6)
-                                     ,float(configfile.tradewithERCtoken6),float(configfile.tradewithETHtoken6),'0',str(configfile.token6name),int(configfile.token6decimals)),
-                                    (7,str(configfile.token7ethaddress),float(configfile.token7high),float(configfile.token7low),
-                                     float(configfile.activatetoken7),float(configfile.token7stoploss),float(configfile.stoplosstoken7)
-                                     ,float(configfile.tradewithERCtoken7),float(configfile.tradewithETHtoken7),'0',str(configfile.token7name),int(configfile.token7decimals)),
-                                    (8,str(configfile.token8ethaddress),float(configfile.token8high),float(configfile.token8low),
-                                     float(configfile.activatetoken8),float(configfile.token8stoploss),float(configfile.stoplosstoken8)
-                                     ,float(configfile.tradewithERCtoken8),float(configfile.tradewithETHtoken8),'0',str(configfile.token8name),int(configfile.token8decimals)),
-                                    (9,str(configfile.token9ethaddress),float(configfile.token9high),float(configfile.token9low),
-                                     float(configfile.activatetoken9),float(configfile.token9stoploss),float(configfile.stoplosstoken9)
-                                     ,float(configfile.tradewithERCtoken9),float(configfile.tradewithETHtoken9),'0',str(configfile.token9name),int(configfile.token9decimals)),
-                                    (10,str(configfile.token10ethaddress),float(configfile.token10high),float(configfile.token10low),
-                                     float(configfile.activatetoken10),float(configfile.token10stoploss),float(configfile.stoplosstoken10)
-                                     ,float(configfile.tradewithERCtoken10),float(configfile.tradewithETHtoken10),'0',str(configfile.token10name),int(configfile.token10decimals))]
 
+            ##for token_number,eth_address,high,low,activate,stoploss_value,stoploss_activate,trade_with_ERC,trade_with_ETH,fast_token in all_token_information:
+            all_token_information = [
+                (1, str(configfile.token1ethaddress), float(configfile.token1high), float(configfile.token1low),
+                 float(configfile.activatetoken1), float(configfile.token1stoploss), float(configfile.stoplosstoken1)
+                 , float(configfile.tradewithERCtoken1), float(configfile.tradewithETHtoken1), '0',
+                 str(configfile.token1name), int(configfile.token1decimals)),
+                (2, str(configfile.token2ethaddress), float(configfile.token2high), float(configfile.token2low),
+                 float(configfile.activatetoken2), float(configfile.token2stoploss), float(configfile.stoplosstoken2)
+                 , float(configfile.tradewithERCtoken2), float(configfile.tradewithETHtoken2), '0',
+                 str(configfile.token2name), int(configfile.token2decimals)),
+                (3, str(configfile.token3ethaddress), float(configfile.token3high), float(configfile.token3low),
+                 float(configfile.activatetoken3), float(configfile.token3stoploss), float(configfile.stoplosstoken3)
+                 , float(configfile.tradewithERCtoken3), float(configfile.tradewithETHtoken3), '0',
+                 str(configfile.token3name), int(configfile.token3decimals)),
+                (4, str(configfile.token4ethaddress), float(configfile.token4high), float(configfile.token4low),
+                 float(configfile.activatetoken4), float(configfile.token4stoploss), float(configfile.stoplosstoken4)
+                 , float(configfile.tradewithERCtoken4), float(configfile.tradewithETHtoken4), '0',
+                 str(configfile.token4name), int(configfile.token4decimals)),
+                (5, str(configfile.token5ethaddress), float(configfile.token5high), float(configfile.token5low),
+                 float(configfile.activatetoken5), float(configfile.token5stoploss), float(configfile.stoplosstoken5)
+                 , float(configfile.tradewithERCtoken5), float(configfile.tradewithETHtoken5), '0',
+                 str(configfile.token5name), int(configfile.token5decimals)),
+                (6, str(configfile.token6ethaddress), float(configfile.token6high), float(configfile.token6low),
+                 float(configfile.activatetoken6), float(configfile.token6stoploss), float(configfile.stoplosstoken6)
+                 , float(configfile.tradewithERCtoken6), float(configfile.tradewithETHtoken6), '0',
+                 str(configfile.token6name), int(configfile.token6decimals)),
+                (7, str(configfile.token7ethaddress), float(configfile.token7high), float(configfile.token7low),
+                 float(configfile.activatetoken7), float(configfile.token7stoploss), float(configfile.stoplosstoken7)
+                 , float(configfile.tradewithERCtoken7), float(configfile.tradewithETHtoken7), '0',
+                 str(configfile.token7name), int(configfile.token7decimals)),
+                (8, str(configfile.token8ethaddress), float(configfile.token8high), float(configfile.token8low),
+                 float(configfile.activatetoken8), float(configfile.token8stoploss), float(configfile.stoplosstoken8)
+                 , float(configfile.tradewithERCtoken8), float(configfile.tradewithETHtoken8), '0',
+                 str(configfile.token8name), int(configfile.token8decimals)),
+                (9, str(configfile.token9ethaddress), float(configfile.token9high), float(configfile.token9low),
+                 float(configfile.activatetoken9), float(configfile.token9stoploss), float(configfile.stoplosstoken9)
+                 , float(configfile.tradewithERCtoken9), float(configfile.tradewithETHtoken9), '0',
+                 str(configfile.token9name), int(configfile.token9decimals)),
+                (10, str(configfile.token10ethaddress), float(configfile.token10high), float(configfile.token10low),
+                 float(configfile.activatetoken10), float(configfile.token10stoploss), float(configfile.stoplosstoken10)
+                 , float(configfile.tradewithERCtoken10), float(configfile.tradewithETHtoken10), '0',
+                 str(configfile.token10name), int(configfile.token10decimals))]
 
             # its now: for token_number,eth_address,high,low,activate,stoploss_value,stoploss_activate,trade_with_ERC,trade_with_ETH,fast_token,small_case_name,decimals in all_token_information:
 
-            for token_number, eth_address, high, low, activate, stoploss_value, stoploss_activate, trade_with_ERC, trade_with_ETH, fast_token, small_case_name,decimals in all_token_information:
-                if (high<low):
+            for token_number, eth_address, high, low, activate, stoploss_value, stoploss_activate, trade_with_ERC, trade_with_ETH, fast_token, small_case_name, decimals in all_token_information:
+                if (high < low):
                     print(
                         'Stop the script, a tokenlow is higher than its tokenhigh')
                     count = 0
@@ -173,7 +183,7 @@ class Worker(QObject):
                     while self.__abort != True:
                         QCoreApplication.processEvents()
                         pass
-                if (ethtokeep>mcotoseeassell):
+                if (ethtokeep > mcotoseeassell):
                     print(
                         'Stop the script, the buy/sell boundary is lower than the $ to keep in BNB after trade')
                     count = 0
@@ -182,12 +192,9 @@ class Worker(QObject):
                         QCoreApplication.processEvents()
                         pass
 
-
-
-
-
             my_address = str(configfile.my_address)
             my_pk = str(configfile.my_pk)
+
             pk = my_pk
             if configfile.maincoinoption == 'BNB':
                 ethaddress = "0x0000000000000000000000000000000000000000"
@@ -207,22 +214,23 @@ class Worker(QObject):
             if configfile.maincoinoption == 'ETH':
                 ethaddress = "0x2170ed0880ac9a755fd29b2688956bd959f933f8"
                 maindecimals = 18
-            maincoinname= configfile.maincoinoption
+            maincoinname = configfile.maincoinoption
             maincoinoption = ethaddress
             append = QtCore.pyqtSignal(str)
 
             if 'step' not in locals():
-                step=1
+                step = 1
             else:
-                step=1
+                step = 1
             self.sig_step.emit(self.__id, 'step ' + str(step))
             QCoreApplication.processEvents()
-            if self.__abort==True:
+            if self.__abort == True:
                 # note that "step" value will not necessarily be same for every thread
                 self.sig_msg.emit('Worker #{} aborting work at step {}'.format(self.__id, step))
-            totaldollars=1
+            totaldollars = 1
 
-            def gettotaltokenbalance(all_token_information,infura_url,ethaddress,maindecimals,my_address):
+            def gettotaltokenbalance(all_token_information, infura_url, ethaddress, maindecimals, my_address,
+                                     ethtokeep):
                 print('(re)Preparing bot...')
                 QCoreApplication.processEvents()
                 if 'step' not in locals():
@@ -235,58 +243,65 @@ class Worker(QObject):
                     # note that "step" value will not necessarily be same for every thread
                     self.sig_msg.emit('Worker #{} aborting work at step {}'.format(self.__id, step))
                 ethbalance = pyetherbalance.PyEtherBalance(infura_url)
-                priceeth = int(float((requests.get('https://api.binance.com/api/v3/ticker/price?symbol=BNBUSDT').json())['price']))
-                threeeth=1
-                ethereum_address=my_address
-                try: #balances
+                priceeth = int(
+                    float((requests.get('https://api.binance.com/api/v3/ticker/price?symbol=BNBUSDT').json())['price']))
+                threeeth = 1
+                ethereum_address = my_address
+                try:  # balances
                     if ethaddress == "0x0000000000000000000000000000000000000000":
                         balance_eth = ethbalance.get_eth_balance(my_address)['balance']
-                        dollarbalancemaintoken=priceeth*balance_eth
+                        dollarbalancemaintoken = priceeth * balance_eth
                     else:
                         details = {'symbol': 'potter', 'address': ethaddress, 'decimals': maindecimals,
                                    'name': 'potter'}
                         erc20tokens = ethbalance.add_token('potter', details)
                         balance_eth = ethbalance.get_token_balance('potter', ethereum_address)['balance']
                         maintokeneth = uniswap_wrapper.get_eth_token_input_price(w33.toChecksumAddress(ethaddress),
-                                                                              100)
+                                                                                 100)
 
                         if maindecimals != 18:
-                            mainusd = (priceeth / (maintokeneth))*100
+                            mainusd = (priceeth / (maintokeneth)) * 100
                         else:
-                            mainusd = (priceeth / (maintokeneth))*100
-                        dollarbalancemaintoken=mainusd*balance_eth
-
+                            mainusd = (priceeth / (maintokeneth)) * 100
+                        dollarbalancemaintoken = mainusd * balance_eth
 
                     if len(all_token_information[0]) > 15:
-                        all_token_information[0] =all_token_information[0][:15]
-                        all_token_information[1] =all_token_information[1][:15]
-                        all_token_information[2] =all_token_information[2][:15]
-                        all_token_information[3] =all_token_information[3][:15]
-                        all_token_information[4] =all_token_information[4][:15]
-                        all_token_information[5] =all_token_information[5][:15]
-                        all_token_information[6] =all_token_information[6][:15]
-                        all_token_information[7] =all_token_information[7][:15]
-                        all_token_information[8] =all_token_information[8][:15]
-                        all_token_information[9] =all_token_information[9][:15]
+                        all_token_information[0] = all_token_information[0][:15]
+                        all_token_information[1] = all_token_information[1][:15]
+                        all_token_information[2] = all_token_information[2][:15]
+                        all_token_information[3] = all_token_information[3][:15]
+                        all_token_information[4] = all_token_information[4][:15]
+                        all_token_information[5] = all_token_information[5][:15]
+                        all_token_information[6] = all_token_information[6][:15]
+                        all_token_information[7] = all_token_information[7][:15]
+                        all_token_information[8] = all_token_information[8][:15]
+                        all_token_information[9] = all_token_information[9][:15]
                     if len(all_token_information[0]) > 14:
                         for token_number, eth_address, high, low, activate, stoploss_value, stoploss_activate, trade_with_ERC, trade_with_ETH, fast_token, small_case_name, decimals, balance, price, dollar_balance in all_token_information:
                             if eth_address != '0' or '':
-                                erc20tokens = ethbalance.add_token(small_case_name, {'symbol': small_case_name, 'address': eth_address, 'decimals': decimals,
-                                           'name': small_case_name})
+                                erc20tokens = ethbalance.add_token(small_case_name,
+                                                                   {'symbol': small_case_name, 'address': eth_address,
+                                                                    'decimals': decimals,
+                                                                    'name': small_case_name})
                                 a = ethbalance.get_token_balance(small_case_name, ethereum_address)['balance']
-                                all_token_information[token_number - 1]= all_token_information[token_number - 1][:12]+(a,all_token_information[token_number - 1][13],all_token_information[token_number - 1][14])
+                                all_token_information[token_number - 1] = all_token_information[token_number - 1][
+                                                                          :12] + (a, all_token_information[
+                                    token_number - 1][13], all_token_information[token_number - 1][14])
                             else:
-                                a=0
-                                all_token_information[token_number - 1] = all_token_information[token_number - 1][:12]+(a,all_token_information[token_number - 1][13],all_token_information[token_number - 1][14])
+                                a = 0
+                                all_token_information[token_number - 1] = all_token_information[token_number - 1][
+                                                                          :12] + (a, all_token_information[
+                                    token_number - 1][13], all_token_information[token_number - 1][14])
                     else:
                         for token_number, eth_address, high, low, activate, stoploss_value, stoploss_activate, trade_with_ERC, trade_with_ETH, fast_token, small_case_name, decimals in all_token_information:
                             if eth_address != '0' or '':
-                                erc20tokens = ethbalance.add_token(small_case_name, {'symbol': small_case_name, 'address': eth_address, 'decimals': decimals,
-                                           'name': small_case_name})
-                                a = ethbalance.get_token_balance(small_case_name, ethereum_address)['balance']
+                                details = {'symbol': small_case_name, 'address': eth_address, 'decimals': decimals,
+                                           'name': small_case_name.upper}
+                                erc20tokens = ethbalance.add_token(small_case_name.upper, details)
+                                a = ethbalance.get_token_balance(small_case_name.upper, ethereum_address)['balance']
                                 all_token_information[token_number - 1] = all_token_information[token_number - 1] + (a,)
                             else:
-                                a=0
+                                a = 0
                                 all_token_information[token_number - 1] = all_token_information[token_number - 1] + (a,)
                     # its now: for token_number,eth_address,high,low,activate,stoploss_value,stoploss_activate,trade_with_ERC,trade_with_ETH,fast_token,small_case_name,decimals,balance in all_token_information:
 
@@ -304,54 +319,195 @@ class Worker(QObject):
                 if self.__abort == True:
                     # note that "step" value will not necessarily be same for every thread
                     self.sig_msg.emit('Worker #{} aborting work at step {}'.format(self.__id, step))
-                try: #prices
+                try:  # prices
                     if len(all_token_information[0]) > 15:
-                        all_token_information[0] =all_token_information[0][:15]
-                        all_token_information[1] =all_token_information[1][:15]
-                        all_token_information[2] =all_token_information[2][:15]
-                        all_token_information[3] =all_token_information[3][:15]
-                        all_token_information[4] =all_token_information[4][:15]
-                        all_token_information[5] =all_token_information[5][:15]
-                        all_token_information[6] =all_token_information[6][:15]
-                        all_token_information[7] =all_token_information[7][:15]
-                        all_token_information[8] =all_token_information[8][:15]
-                        all_token_information[9] =all_token_information[9][:15]
+                        all_token_information[0] = all_token_information[0][:15]
+                        all_token_information[1] = all_token_information[1][:15]
+                        all_token_information[2] = all_token_information[2][:15]
+                        all_token_information[3] = all_token_information[3][:15]
+                        all_token_information[4] = all_token_information[4][:15]
+                        all_token_information[5] = all_token_information[5][:15]
+                        all_token_information[6] = all_token_information[6][:15]
+                        all_token_information[7] = all_token_information[7][:15]
+                        all_token_information[8] = all_token_information[8][:15]
+                        all_token_information[9] = all_token_information[9][:15]
+                    priceeth = int(
+                        float((requests.get(
+                            'https://api.binance.com/api/v3/ticker/price?symbol=BNBUSDT').json())[
+                                  'price']))
+
                     if len(all_token_information[0]) > 14:
                         for token_number, eth_address, high, low, activate, stoploss_value, stoploss_activate, trade_with_ERC, trade_with_ETH, fast_token, small_case_name, decimals, balance, price, dollar_balance in all_token_information:
                             if str(eth_address) != '0' or '':
-                                token1eth = uniswap_wrapper.get_eth_token_input_price(w33.toChecksumAddress(eth_address),
-                                                                                      100)
+                                token1eth = uniswap_wrapper.get_eth_token_input_price(
+                                    w33.toChecksumAddress(eth_address),
+                                    10000000000000)
                                 if decimals != 18:
-                                    pricetoken1usd = (priceeth / (token1eth)) / (
-                                            10 ** (18 - (decimals)))
+                                    pricetoken1usd = (priceeth / (token1eth)) / (10 ** (18 - (decimals)))
                                 else:
                                     pricetoken1usd = (priceeth / (token1eth))
                                 a = pricetoken1usd
-                                all_token_information[token_number - 1] = all_token_information[token_number - 1][:13]+(a,all_token_information[token_number - 1][14])
+                                all_token_information[token_number - 1] = all_token_information[token_number - 1][
+                                                                          :13] + (a, all_token_information[
+                                    token_number - 1][14])
                             else:
                                 a = 0
-                                all_token_information[token_number - 1] = all_token_information[token_number - 1][:13]+(a,all_token_information[token_number - 1][14])
+                                all_token_information[token_number - 1] = all_token_information[token_number - 1][
+                                                                          :13] + (a, all_token_information[
+                                    token_number - 1][14])
                     else:
                         for token_number, eth_address, high, low, activate, stoploss_value, stoploss_activate, trade_with_ERC, trade_with_ETH, fast_token, small_case_name, decimals, balance in all_token_information:
                             if str(eth_address) != '0' or '':
-                                    token1eth = uniswap_wrapper.get_eth_token_input_price(w33.toChecksumAddress(eth_address),
-                                                                                          100)
+                                try:
+                                    token1eth = uniswap_wrapper.get_eth_token_input_price(
+                                        w33.toChecksumAddress(eth_address),
+                                        10000000000000)
                                     if decimals != 18:
-                                        pricetoken1usd = (priceeth / (token1eth)) / (
-                                                10 ** (18 - (decimals)))
+                                        pricetoken1usd = (priceeth / (token1eth)) / (10 ** (18 - (decimals)))
                                     else:
                                         pricetoken1usd = (priceeth / (token1eth))
-                                    a=pricetoken1usd
-                                    all_token_information[token_number - 1] = all_token_information[token_number - 1] + (a,)
+                                    a = pricetoken1usd
+                                    all_token_information[token_number - 1] = all_token_information[token_number - 1][
+                                                                              :13] + (a,)
+                                except Exception as e:
+                                    exception_type, exception_object, exception_traceback = sys.exc_info()
+                                    if configfile.debugmode == '1':
+                                        print(str(e) + ' on line: ' + str(exception_traceback.tb_lineno))
+                                        e = (str(e))
+                                    if 'Could not decode' in str(e):
+                                        try:
+                                            kanka = uniconnect.factory_contract.functions.getPair(
+                                                w33.toChecksumAddress(eth_address),
+                                                token22).call()
+                                            kanka2 = uniconnect._load_contract(abi_name="erc20",
+                                                                               address=w33.toChecksumAddress(
+                                                                                   eth_address)).functions.balanceOf(
+                                                kanka).call
+                                            if kanka2 < 2:
+                                                print(
+                                                    'Token ' + str(token_number) + ' has no liquidity on Pancakeswap 2')
+                                        except:
+                                            print(
+                                                'Token ' + str(token_number) + ' has no liquidity on Pancakeswap 2')
+                                    b = None
+                                    letsgoo = 0
+
+                                    if ethaddress == "0x0000000000000000000000000000000000000000":
+                                        if 1 == 0:
+                                            kjh = 0
+                                            toofast = 0
+                                            while (b == None) == True and self.__abort != True:
+                                                time.sleep(1 / 5)
+                                                QCoreApplication.processEvents()
+                                                print('Going into front-running mode')
+                                                uniconnect = Uniswap(str(configfile.my_address),
+                                                                     str(configfile.my_pk), web3=Web3(
+                                                        w33.HTTPProvider(str(configfile.infuraurl))),
+                                                                     version=2, max_slippage=float(
+                                                        configfile.max_slippage))
+                                                try:
+                                                    kanka = uniconnect.factory_contract.functions.getPair(
+                                                        Web3.toChecksumAddress(eth_address), Web3.toChecksumAddress(
+                                                            '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c')).call()
+
+                                                    kanka2 = uniconnect._load_contract(abi_name="erc20",
+                                                                                       address=Web3.toChecksumAddress(
+                                                                                           eth_address)).functions.balanceOf(
+                                                        kanka).call()
+                                                    if kjh == 0 and int(kanka2) > 0:
+                                                        toofast = 1
+                                                        raise ValueError('Error 2x3')
+                                                    if int(kanka2) > 0 and toofast == 0:
+                                                        uniconnect._build_and_send_tx(gwei=gwei, my_address=str(
+                                                            configfile.my_address), my_pk=str(configfile.my_pk),
+                                                                                      function=uniconnect.router.functions.swapExactETHForTokens(
+                                                                                          (types.Wei(tradeamount)), [
+                                                                                              uniconnect.get_weth_address(),
+                                                                                              token], my_address,
+                                                                                          uniconnect._deadline()),
+                                                                                      tx_params=uniconnect._get_tx_params(
+                                                                                          value=(
+                                                                                              types.Wei(tradeamount)),
+                                                                                          gwei=gwei,
+                                                                                          my_address=my_address))
+                                                        print('Front running...')
+                                                        b = 0
+                                                    if int(kanka2) > 0 and toofast == 1:
+                                                        print('Restart the script please')
+                                                    raise ValueError('Token not on Pancakeswap (yet).')
+                                                except Exception as e:
+                                                    exception_type, exception_object, exception_traceback = sys.exc_info()
+                                                    if kjh == 0:
+                                                        print(
+                                                            str(e) + ' on line: ' + str(exception_traceback.tb_lineno))
+                                                        kjh = 1
+                                                    token1eth = None
+                                                    print(strftime("%H:%M:%S", localtime()) + ' Token ' + str(
+                                                        token_number) + ' is not (yet) available on pancakeswap or the address is incorrect. If you know the token is not yet released, and want to front-run, let this run. If not, please stop and enter a valid token address.')
+                                                    a = None
+                                                    all_token_information[token_number - 1] = all_token_information[
+                                                                                                  token_number - 1] + (
+                                                                                              a,)
+                                                    b = None
+                                                    if letsgoo == 0:
+                                                        selldecimals = 18
+                                                        gwei = types.Wei(
+                                                            Web3.toWei(int(configfile.maxgweinumber), "gwei"))
+                                                        eth = Web3.toChecksumAddress(ethaddress)
+                                                        token = w33.toChecksumAddress(eth_address)
+                                                        if ethaddress == "0x0000000000000000000000000000000000000000":
+                                                            ethbalance = pyetherbalance.PyEtherBalance(
+                                                                configfile.infuraurl)
+                                                            balance_eth = ethbalance.get_eth_balance(
+                                                                configfile.my_address)
+                                                            priceeth = int(
+                                                                float((requests.get(
+                                                                    'https://api.binance.com/api/v3/ticker/price?symbol=BNBUSDT').json())[
+                                                                          'price']))
+                                                            ethamount2 = (float(balance_eth['balance'])) - (
+                                                                    ethtokeep / (float(priceeth)))
+                                                        else:
+                                                            ethbalance = pyetherbalance.PyEtherBalance(
+                                                                str(configfile.infuraurl))
+                                                            balance_eth = \
+                                                            ethbalance.get_eth_balance(str(configfile.my_address))[
+                                                                'balance']
+                                                            token2 = small_case_name.upper
+                                                            details2 = {'symbol': small_case_name.upper,
+                                                                        'address': ethaddress,
+                                                                        'decimals': selldecimals,
+                                                                        'name': small_case_name.upper}
+                                                            erc20tokens2 = ethbalance.add_token(token2, details2)
+                                                            ethamount2 = ethbalance.get_token_balance(token2, str(
+                                                                configfile.my_address))[
+                                                                'balance']
+                                                        tradeamount = int(
+                                                            (ethamount2 / 1.000000001) * 10 ** selldecimals)
+                                                        ethamount = tradeamount
+                                                        contractaddress = token
+                                                        if tradeamount < 0:
+                                                            tradeamount = int(1)
+                                                        ethamount = ethamount2
+                                                        if uniswap_wrapper._is_approved(
+                                                                token=w33.toChecksumAddress(eth_address)) == True:
+                                                            print('token already approved')
+                                                        else:
+                                                            uniswap_wrapper.approve(
+                                                                token=w33.toChecksumAddress(eth_address))
+                                                    letsgoo = 1
+                                    else:
+                                        print('Please use BNB as main token/coin if you want to front-run')
+
                             else:
-                                a=0
+                                a = 0
                                 all_token_information[token_number - 1] = all_token_information[token_number - 1] + (a,)
+
                     # its now: for token_number,eth_address,high,low,activate,stoploss_value,stoploss_activate,trade_with_ERC,trade_with_ETH,fast_token,small_case_name,decimals,balance,price in all_token_information:
                 except Exception as e:
                     exception_type, exception_object, exception_traceback = sys.exc_info()
                     if configfile.debugmode == '1':
                         print(str(e) + ' on line: ' + str(exception_traceback.tb_lineno))
-                totalbalancedollarscript=0
+                totalbalancedollarscript = 0
                 if len(all_token_information[0]) > 15:
                     all_token_information[0] = all_token_information[0][:15]
                     all_token_information[1] = all_token_information[1][:15]
@@ -363,18 +519,20 @@ class Worker(QObject):
                     all_token_information[7] = all_token_information[7][:15]
                     all_token_information[8] = all_token_information[8][:15]
                     all_token_information[9] = all_token_information[9][:15]
-                if len(all_token_information[0]) >14:
-                    for token_number,eth_address,high,low,activate,stoploss_value,stoploss_activate,trade_with_ERC,trade_with_ETH,fast_token,small_case_name,decimals,balance,price,dollar_balance in all_token_information:
+                if len(all_token_information[0]) > 14:
+                    for token_number, eth_address, high, low, activate, stoploss_value, stoploss_activate, trade_with_ERC, trade_with_ETH, fast_token, small_case_name, decimals, balance, price, dollar_balance in all_token_information:
                         if balance != 0:
-                            a= price*balance*100
-                            all_token_information[token_number - 1]= all_token_information[token_number - 1][:14]+(a,)
+                            a = price * balance * 100
+                            all_token_information[token_number - 1] = all_token_information[token_number - 1][:14] + (
+                            a,)
                         else:
                             a = 0
-                            all_token_information[token_number - 1] = all_token_information[token_number - 1][:14]+(a,)
+                            all_token_information[token_number - 1] = all_token_information[token_number - 1][:14] + (
+                            a,)
 
-                        totalbalancedollarscript+=a
-                        if token_number==10:
-                            totalbalancedollarscript +=dollarbalancemaintoken
+                        totalbalancedollarscript += a
+                        if token_number == 10:
+                            totalbalancedollarscript += dollarbalancemaintoken
                 else:
                     for token_number, eth_address, high, low, activate, stoploss_value, stoploss_activate, trade_with_ERC, trade_with_ETH, fast_token, small_case_name, decimals, balance, price in all_token_information:
                         if balance != 0:
@@ -388,31 +546,34 @@ class Worker(QObject):
                         if token_number == 10:
                             totalbalancedollarscript += dollarbalancemaintoken
 
-
                 # its now: for token_number,eth_address,high,low,activate,stoploss_value,stoploss_activate,trade_with_ERC,
                 # trade_with_ETH,fast_token,small_case_name,decimals,balance,price, dollar_balance in all_token_information:
 
-                maintokenbalance=balance_eth
-                return {'all_token_information':all_token_information, 'totalbalancedollarscript': totalbalancedollarscript, 'dollarbalancemaintoken': dollarbalancemaintoken,'maintokenbalance':maintokenbalance}
+                maintokenbalance = balance_eth
+                return {'all_token_information': all_token_information,
+                        'totalbalancedollarscript': totalbalancedollarscript,
+                        'dollarbalancemaintoken': dollarbalancemaintoken, 'maintokenbalance': maintokenbalance}
 
             QCoreApplication.processEvents()
             if 'step' not in locals():
-                step=1
+                step = 1
             else:
-                step=1
+                step = 1
             self.sig_step.emit(self.__id, 'step ' + str(step))
             QCoreApplication.processEvents()
-            if self.__abort==True:
+            if self.__abort == True:
                 # note that "step" value will not necessarily be same for every thread
                 self.sig_msg.emit('Worker #{} aborting work at step {}'.format(self.__id, step))
-            def checkbalance(all_token_information,infura_url, my_address, maincoinoption,dollarbalancemaintoken, mcotoseeassell):
+
+            def checkbalance(all_token_information, infura_url, my_address, maincoinoption, dollarbalancemaintoken,
+                             mcotoseeassell):
 
                 ethereum_address = my_address
                 cg = CoinGeckoAPI()
 
                 ethbalance = pyetherbalance.PyEtherBalance(infura_url)
 
-                for token_number, eth_address, high, low, activate, stoploss_value, stoploss_activate, trade_with_ERC,trade_with_ETH,fast_token,small_case_name,decimals,balance,price, dollar_balance in all_token_information:
+                for token_number, eth_address, high, low, activate, stoploss_value, stoploss_activate, trade_with_ERC, trade_with_ETH, fast_token, small_case_name, decimals, balance, price, dollar_balance in all_token_information:
                     if (dollarbalancemaintoken > mcotoseeassell):
                         gelukt = "sell"
                     else:
@@ -435,7 +596,7 @@ class Worker(QObject):
                     if (dollarbalancemaintoken > mcotoseeassell and gelukt != "sell"):
                         gelukt2 = "sell"
                     else:
-                        if dollar_balance > mcotoseeassell and gelukt != 'buy '+small_case_name:
+                        if dollar_balance > mcotoseeassell and gelukt != 'buy ' + small_case_name:
                             gelukt2 = "buy " + small_case_name
                     keer = 0
                     if 'gelukt2' not in locals():
@@ -444,69 +605,95 @@ class Worker(QObject):
                     gelukt3 = gelukt2
                 except:
                     gelukt2 = '0'
-                return {'keer': keer, 'gelukt': gelukt, 'gelukt2': gelukt2,'all_token_information': all_token_information}
+                return {'keer': keer, 'gelukt': gelukt, 'gelukt2': gelukt2,
+                        'all_token_information': all_token_information}
 
-            def getprice(all_token_information,incaseofbuyinghowmuch,uniswap_wrapper, timesleep, gelukt, maintokenbalance, ethaddress, maindecimals,totalbalancedollarscript):
+            def getprice(all_token_information, incaseofbuyinghowmuch, uniswap_wrapper, timesleep, gelukt,
+                         maintokenbalance, ethaddress, maindecimals, totalbalancedollarscript):
                 count = 0
                 try:
                     QCoreApplication.processEvents()
 
                     while count < timesleep:
-                        count =count+ 1
+                        count = count + 1
                         QtTest.QTest.qWait(1000)
                         QCoreApplication.processEvents()
                     QtTest.QTest.qWait(166)
                     if ethaddress == "0x0000000000000000000000000000000000000000" and maintokenbalance > 0.001:
-                        priceeth = int(float((requests.get('https://api.binance.com/api/v3/ticker/price?symbol=BNBUSDT').json())['price']))
-                        threeeth = int(maintokenbalance*1000000000000000000)
+                        priceeth = int(float(
+                            (requests.get('https://api.binance.com/api/v3/ticker/price?symbol=BNBUSDT').json())[
+                                'price']))
+                        threeeth = int(maintokenbalance * 1000000000000000000)
                     if ethaddress == "0x0000000000000000000000000000000000000000" and maintokenbalance < 0.001:
                         threeeth = 1
-                        priceeth = int(float((requests.get('https://api.binance.com/api/v3/ticker/price?symbol=BNBUSDT').json())['price']))
+                        priceeth = int(float(
+                            (requests.get('https://api.binance.com/api/v3/ticker/price?symbol=BNBUSDT').json())[
+                                'price']))
                     if ethaddress != "0x0000000000000000000000000000000000000000":
                         if ethaddress == "0x1af3f329e8be154074d8769d1ffa4ee058b1dbc3":
-                            jajaja = (float((requests.get('https://api.binance.com/api/v3/ticker/price?symbol=BUSDDAI').json())['price']))
-                            priceeth = int(float((requests.get('https://api.binance.com/api/v3/ticker/price?symbol=BNBUSDT').json())['price']))
-                            ethtest = (jajaja / priceeth)*maintokenbalance
+                            jajaja = (float(
+                                (requests.get('https://api.binance.com/api/v3/ticker/price?symbol=BUSDDAI').json())[
+                                    'price']))
+                            priceeth = int(float(
+                                (requests.get('https://api.binance.com/api/v3/ticker/price?symbol=BNBUSDT').json())[
+                                    'price']))
+                            ethtest = (jajaja / priceeth) * maintokenbalance
                             if ethtest < 0.01:
                                 threeeth = 1
                             else:
-                                threeeth=int((ethtest)*1000000000000000000)
+                                threeeth = int((ethtest) * 1000000000000000000)
 
                         if ethaddress == "0xe9e7cea3dedca5984780bafc599bd69add087d56":
-                            jajaja = (float((requests.get('https://api.binance.com/api/v3/ticker/price?symbol=BUSDUSDT').json())['price']))
-                            priceeth = int(float((requests.get('https://api.binance.com/api/v3/ticker/price?symbol=BNBUSDT').json())['price']))
-                            ethtest = (jajaja / priceeth)*maintokenbalance
+                            jajaja = (float(
+                                (requests.get('https://api.binance.com/api/v3/ticker/price?symbol=BUSDUSDT').json())[
+                                    'price']))
+                            priceeth = int(float(
+                                (requests.get('https://api.binance.com/api/v3/ticker/price?symbol=BNBUSDT').json())[
+                                    'price']))
+                            ethtest = (jajaja / priceeth) * maintokenbalance
 
                             if ethtest < 0.01:
                                 threeeth = 1
                             else:
-                                threeeth=int((ethtest)*1000000000000000000)
-
+                                threeeth = int((ethtest) * 1000000000000000000)
 
                         if ethaddress == "0x8ac76a51cc950d9822d68b83fe1ad97b32cd580d":
-                            jajaja = (float((requests.get('https://api.binance.com/api/v3/ticker/price?symbol=USDCBUSD').json())['price']))
-                            priceeth = int(float((requests.get('https://api.binance.com/api/v3/ticker/price?symbol=BNBUSDT').json())['price']))
-                            ethtest = (jajaja / priceeth)*maintokenbalance
+                            jajaja = (float(
+                                (requests.get('https://api.binance.com/api/v3/ticker/price?symbol=USDCBUSD').json())[
+                                    'price']))
+                            priceeth = int(float(
+                                (requests.get('https://api.binance.com/api/v3/ticker/price?symbol=BNBUSDT').json())[
+                                    'price']))
+                            ethtest = (jajaja / priceeth) * maintokenbalance
                             if ethtest < 0.01:
                                 threeeth = 1
                             else:
-                                threeeth=int((ethtest)*1000000000000000000)
+                                threeeth = int((ethtest) * 1000000000000000000)
+
                         if ethaddress == "0x7130d2a12b9bcbfae4f2634d864a1ee1ce3ead9c":
-                            jajaja = (float((requests.get('https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT').json())['price']))
-                            priceeth = int(float((requests.get('https://api.binance.com/api/v3/ticker/price?symbol=BNBUSDT').json())['price']))
-                            ethtest = (jajaja / priceeth)*maintokenbalance
+                            jajaja = (float(
+                                (requests.get('https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT').json())[
+                                    'price']))
+                            priceeth = int(float(
+                                (requests.get('https://api.binance.com/api/v3/ticker/price?symbol=BNBUSDT').json())[
+                                    'price']))
+                            ethtest = (jajaja / priceeth) * maintokenbalance
                             if ethtest < 0.01:
                                 threeeth = 1
                             else:
-                                threeeth=int((ethtest)*1000000000000000000)
+                                threeeth = int((ethtest) * 1000000000000000000)
                         if ethaddress == "0x2170ed0880ac9a755fd29b2688956bd959f933f8":
-                            jajaja = (float((requests.get('https://api.binance.com/api/v3/ticker/price?symbol=ETHUSDT').json())['price']))
-                            priceeth = int(float((requests.get('https://api.binance.com/api/v3/ticker/price?symbol=BNBUSDT').json())['price']))
-                            ethtest = (jajaja / priceeth)*maintokenbalance
+                            jajaja = (float(
+                                (requests.get('https://api.binance.com/api/v3/ticker/price?symbol=ETHUSDT').json())[
+                                    'price']))
+                            priceeth = int(float(
+                                (requests.get('https://api.binance.com/api/v3/ticker/price?symbol=BNBUSDT').json())[
+                                    'price']))
+                            ethtest = (jajaja / priceeth) * maintokenbalance
                             if ethtest < 0.01:
                                 threeeth = 1
                             else:
-                                threeeth=int((ethtest)*1000000000000000000)
+                                threeeth = int((ethtest) * 1000000000000000000)
                     QCoreApplication.processEvents()
                     if 'step' not in locals():
                         step = 1
@@ -519,7 +706,9 @@ class Worker(QObject):
                         self.sig_msg.emit('Worker #{} aborting work at step {}'.format(self.__id, step))
                     if 'buy' in gelukt:
                         priceright = 'buy'
-                        threeeth= int((totalbalancedollarscript/int(float((requests.get('https://api.binance.com/api/v3/ticker/price?symbol=BNBUSDT').json())['price'])))*1000000000000000000)
+                        threeeth = int((totalbalancedollarscript / int(float(
+                            (requests.get('https://api.binance.com/api/v3/ticker/price?symbol=BNBUSDT').json())[
+                                'price']))) * 1000000000000000000)
                     else:
                         priceright = 'sell'
                     if ethaddress == "0x0000000000000000000000000000000000000000":
@@ -534,7 +723,8 @@ class Worker(QObject):
                                     10 ** (18 - (maindecimals))))
                         else:
                             dollarbalancemaintoken = maintokenbalance * (priceeth / (token11eth2))
-                    priceeth = int(float((requests.get('https://api.binance.com/api/v3/ticker/price?symbol=BNBUSDT').json())['price']))
+                    priceeth = int(float(
+                        (requests.get('https://api.binance.com/api/v3/ticker/price?symbol=BNBUSDT').json())['price']))
                     QCoreApplication.processEvents()
                     if 'step' not in locals():
                         step = 1
@@ -546,46 +736,60 @@ class Worker(QObject):
                         # note that "step" value will not necessarily be same for every thread
                         self.sig_msg.emit('Worker #{} aborting work at step {}'.format(self.__id, step))
 
-
-                    for token_number, eth_address, high, low, activate, stoploss_value, stoploss_activate, trade_with_ERC,\
-                        trade_with_ETH,fast_token,small_case_name,decimals,balance,price, dollar_balance in all_token_information:
+                    priceright = 'buy'
+                    for token_number, eth_address, high, low, activate, stoploss_value, stoploss_activate, trade_with_ERC, \
+                        trade_with_ETH, fast_token, small_case_name, decimals, balance, price, dollar_balance in all_token_information:
                         if eth_address != '0':
                             if priceright == 'sell':
-                                token1eth = uniswap_wrapper.get_eth_token_input_price(w33.toChecksumAddress(eth_address),
-                                                                                      threeeth)
+                                token1eth = uniswap_wrapper.get_eth_token_input_price(
+                                    w33.toChecksumAddress(eth_address),
+                                    threeeth)
                                 token1eth2 = token1eth / threeeth
                                 if decimals != 18:
                                     pricetoken1usd = (priceeth / (token1eth2)) / (10 ** (18 - (decimals)))
                                     dollarbalancetoken1 = pricetoken1usd * balance
-
-                                    all_token_information[token_number - 1] = all_token_information[token_number - 1][:13] + (pricetoken1usd,dollarbalancetoken1)
+                                    all_token_information[token_number - 1] = all_token_information[token_number - 1][
+                                                                              :13] + (
+                                                                              pricetoken1usd, dollarbalancetoken1)
                                 else:
                                     pricetoken1usd = (priceeth / (token1eth2))
                                     dollarbalancetoken1 = pricetoken1usd * balance
-                                    all_token_information[token_number - 1] = all_token_information[token_number - 1][:13] + (pricetoken1usd, dollarbalancetoken1)
+                                    if eth_address == '0x8ac76a51cc950d9822d68b83fe1ad97b32cd580d':
+                                        pricetoken1usd = 1.032319
+                                    all_token_information[token_number - 1] = all_token_information[token_number - 1][
+                                                                              :13] + (
+                                                                              pricetoken1usd, dollarbalancetoken1)
                             else:
-                                token1eth = uniswap_wrapper.get_token_eth_output_price(w33.toChecksumAddress(eth_address),
-                                                                                       threeeth)
+                                token1eth = uniswap_wrapper.get_token_eth_output_price(
+                                    w33.toChecksumAddress(eth_address),
+                                    threeeth)
                                 token1eth2 = (token1eth / threeeth)
                                 if decimals != 18:
                                     pricetoken1usd = (priceeth / (token1eth2)) / (10 ** (18 - (decimals)))
                                     dollarbalancetoken1 = pricetoken1usd * balance
-                                    all_token_information[token_number - 1] = all_token_information[token_number - 1][:13] + (pricetoken1usd, dollarbalancetoken1)
+                                    all_token_information[token_number - 1] = all_token_information[token_number - 1][
+                                                                              :13] + (
+                                                                              pricetoken1usd, dollarbalancetoken1)
                                 else:
                                     pricetoken1usd = (priceeth / (token1eth2))
                                     dollarbalancetoken1 = pricetoken1usd * balance
-                                    all_token_information[token_number - 1] = all_token_information[token_number - 1][:13] + (pricetoken1usd, dollarbalancetoken1)
+                                    if eth_address == '0x8ac76a51cc950d9822d68b83fe1ad97b32cd580d':
+                                        pricetoken1usd = 1.032319
+                                    all_token_information[token_number - 1] = all_token_information[token_number - 1][
+                                                                              :13] + (
+                                                                              pricetoken1usd, dollarbalancetoken1)
                         else:
                             pricetoken1usd = 0
                             dollarbalancetoken1 = 0
-                            all_token_information[token_number - 1] = all_token_information[token_number - 1][:13] + (pricetoken1usd, dollarbalancetoken1)
+                            all_token_information[token_number - 1] = all_token_information[token_number - 1][:13] + (
+                            pricetoken1usd, dollarbalancetoken1)
 
-                    weergave=''
+                    weergave = ''
 
-                    for token_number, eth_address, high, low, activate, stoploss_value, stoploss_activate, trade_with_ERC,\
-                        trade_with_ETH,fast_token,small_case_name,decimals,balance,price, dollar_balance in all_token_information:
-                        if eth_address != '0' and activate==1:
-                            weergave+= ('   [' + small_case_name + '  ' + str("{:.6f}".format(price)) + ']')
+                    for token_number, eth_address, high, low, activate, stoploss_value, stoploss_activate, trade_with_ERC, \
+                        trade_with_ETH, fast_token, small_case_name, decimals, balance, price, dollar_balance in all_token_information:
+                        if eth_address != '0' and activate == 1:
+                            weergave += ('   [' + small_case_name + '  ' + str("{:.6f}".format(price)) + ']')
                     QCoreApplication.processEvents()
                     if 'step' not in locals():
                         step = 1
@@ -596,17 +800,19 @@ class Worker(QObject):
                     if self.__abort == True:
                         # note that "step" value will not necessarily be same for every thread
                         self.sig_msg.emit('Worker #{} aborting work at step {}'.format(self.__id, step))
-                    return {'all_token_information': all_token_information,'priceeth': priceeth, 'weergave': weergave,'dollarbalancemaintoken': dollarbalancemaintoken}
+                    return {'all_token_information': all_token_information, 'priceeth': priceeth, 'weergave': weergave,
+                            'dollarbalancemaintoken': dollarbalancemaintoken}
                 except Exception as e:
                     o = 0
                     exception_type, exception_object, exception_traceback = sys.exc_info()
                     if configfile.debugmode == '1':
                         print(str(e) + ' on line: ' + str(exception_traceback.tb_lineno))
 
-            def letstrade(all_token_information,keer, my_address, pk, max_slippage,
+            def letstrade(all_token_information, keer, my_address, pk, max_slippage,
                           infura_url, gelukt,
                           tokentokennumerator,
-                          weergave, notyet, priceeth, speed,maxgwei,maxgweinumber,diffdeposit,diffdepositaddress,maindecimals,timesleepaftertrade):
+                          weergave, notyet, priceeth, speed, maxgwei, maxgweinumber, diffdeposit, diffdepositaddress,
+                          maindecimals, timesleepaftertrade):
                 QCoreApplication.processEvents()
                 if 'step' not in locals():
                     step = 1
@@ -617,24 +823,29 @@ class Worker(QObject):
                 if self.__abort == True:
                     # note that "step" value will not necessarily be same for every thread
                     self.sig_msg.emit('Worker #{} aborting work at step {}'.format(self.__id, step))
-                for token_number, eth_address, high, low, activate, stoploss_value, stoploss_activate, trade_with_ERC,\
-                    trade_with_ETH,fast_token,small_case_name,decimals,balance,price, dollar_balance in all_token_information:
+                for token_number, eth_address, high, low, activate, stoploss_value, stoploss_activate, trade_with_ERC, \
+                    trade_with_ETH, fast_token, small_case_name, decimals, balance, price, dollar_balance in all_token_information:
                     QCoreApplication.processEvents()
                     for token_number2, eth_address2, high2, low2, activate2, stoploss_value2, stoploss_activate2, trade_with_ERC2, \
                         trade_with_ETH2, fast_token2, small_case_name2, decimals2, balance2, price2, dollar_balance2 in all_token_information:
                         if eth_address != eth_address2:
-                            if eth_address != 0 and eth_address2 !=0:
+                            if eth_address != 0 and eth_address2 != 0:
                                 if price > ((high + low) / 2) and price2 < (
                                         (high2 + low2) / 2):
-                                    locals()['token%stotoken%s' % (str(token_number),str(token_number2))] = ((price - low) / (high - low)) / (
-                                        (price2 - low2) / (high2 - low2))
+                                    locals()['token%stotoken%s' % (str(token_number), str(token_number2))] = ((
+                                                                                                                          price - low) / (
+                                                                                                                          high - low)) / (
+                                                                                                                     (
+                                                                                                                                 price2 - low2) / (
+                                                                                                                                 high2 - low2))
                                 else:
                                     locals()['token%stotoken%s' % (str(token_number), str(token_number2))] = 0.1
                             else:
                                 locals()['token%stotoken%s' % (str(token_number), str(token_number2))] = 0.1
 
                 def makeTrade(buytokenaddress, selltokenaddress, my_address, pk, max_slippage, infura_url,
-                              buysmallcasesymbol, sellsmallcasesymbol, ethtokeep, speed,maxgwei,maxgweinumber,diffdeposit,diffdepositaddress,ethaddress):
+                              buysmallcasesymbol, sellsmallcasesymbol, ethtokeep, speed, maxgwei, maxgweinumber,
+                              diffdeposit, diffdepositaddress, ethaddress):
                     selldecimals = 18
                     try:
                         def api(speed):
@@ -643,8 +854,12 @@ class Worker(QObject):
                             data = int(res.json()[speed] / 10)
                             return data
 
-                        print('Current gwei chosen for trading:'+configfile.maxgweinumber+'.   Current BNB price:$'+str(int(float((requests.get('https://api.binance.com/api/v3/ticker/price?symbol=BNBUSDT').json())['price']))))
-                        gwei=types.Wei(Web3.toWei(int(configfile.maxgweinumber), "gwei"))
+                        print(
+                            'Current gwei chosen for trading:' + configfile.maxgweinumber + '.   Current BNB price:$' + str(
+                                int(float(
+                                    (requests.get('https://api.binance.com/api/v3/ticker/price?symbol=BNBUSDT').json())[
+                                        'price']))))
+                        gwei = types.Wei(Web3.toWei(int(configfile.maxgweinumber), "gwei"))
 
                     except Exception as e:
                         o = 0
@@ -652,7 +867,7 @@ class Worker(QObject):
                         if configfile.debugmode == '1':
                             print(str(e) + ' on line: ' + str(exception_traceback.tb_lineno))
                         w33.eth.setGasPriceStrategy(fast_gas_price_strategy)
-                    if 1==1:
+                    if 1 == 1:
 
                         try:
                             uniconnect = Uniswap(my_address, pk, web3=Web3(
@@ -669,7 +884,9 @@ class Worker(QObject):
                             if selltokenaddress == "0x0000000000000000000000000000000000000000":
                                 ethbalance = pyetherbalance.PyEtherBalance(infura_url)
                                 balance_eth = ethbalance.get_eth_balance(my_address)
-                                priceeth = int(float((requests.get('https://api.binance.com/api/v3/ticker/price?symbol=BNBUSDT').json())['price']))
+                                priceeth = int(float(
+                                    (requests.get('https://api.binance.com/api/v3/ticker/price?symbol=BNBUSDT').json())[
+                                        'price']))
                                 ethamount2 = (float(balance_eth['balance'])) - (
                                         ethtokeep / (float(priceeth)))
                             else:
@@ -691,16 +908,18 @@ class Worker(QObject):
                             exception_type, exception_object, exception_traceback = sys.exc_info()
                             if configfile.debugmode == '1':
                                 print(str(e) + ' on line: ' + str(exception_traceback.tb_lineno))
-                        tradeamount = int((ethamount2/1.000000001) * 10 ** selldecimals)
-                        if tradeamount <0:
-                            tradeamount=int(1)
+                        tradeamount = int((ethamount2 / 1.000000001) * 10 ** selldecimals)
+                        if len(str(tradeamount)) > 2:
+                            tradeamount = int(str(tradeamount)[:-2] + '00')
+                        if tradeamount < 0:
+                            tradeamount = int(1)
 
                         ethamount = ethamount2
                         contractaddress = token
                         if int(diffdeposit) == 0:
-                            uniconnect.make_trade(eth, token, tradeamount,gwei,my_address,pk,my_address)
+                            uniconnect.make_trade(eth, token, tradeamount, gwei, my_address, pk, my_address)
                         if int(diffdeposit) == 1:
-                            uniconnect.make_trade(eth, token, tradeamount, gwei, my_address, pk,diffdepositaddress)
+                            uniconnect.make_trade(eth, token, tradeamount, gwei, my_address, pk, diffdepositaddress)
 
                         if buytokenaddress == ethaddress:
                             gelukt = 'sell'
@@ -708,8 +927,12 @@ class Worker(QObject):
                             gelukt = 'buy ' + buysmallcasesymbol
                         return {'gelukt': gelukt}
                     else:
-                        print('Current gwei chosen for trading:'+configfile.maxgweinumber+'.   Current BNB price:$'+str(int(float((requests.get('https://api.binance.com/api/v3/ticker/price?symbol=BNBUSDT').json())['price']))))
-                        gelukt='mislukt'
+                        print(
+                            'Current gwei chosen for trading:' + configfile.maxgweinumber + '.   Current BNB price:$' + str(
+                                int(float(
+                                    (requests.get('https://api.binance.com/api/v3/ticker/price?symbol=BNBUSDT').json())[
+                                        'price']))))
+                        gelukt = 'mislukt'
                         return {'gelukt': gelukt}
 
                 QCoreApplication.processEvents()
@@ -725,16 +948,20 @@ class Worker(QObject):
 
                 try:
                     for token_number, eth_address, high, low, activate, stoploss_value, stoploss_activate, trade_with_ERC, trade_with_ETH, fast_token, small_case_name, decimals, balance, price, dollar_balance in all_token_information:  # stop loss
-                        if (price < stoploss_value and stoploss_activate == 1 and activate == 1 and trade_with_ETH == 1 and gelukt == "buy " + small_case_name) or (
+                        if (
+                                price < stoploss_value and stoploss_activate == 1 and activate == 1 and trade_with_ETH == 1 and gelukt == "buy " + small_case_name) or (
                                 price < stoploss_value and activate == 1 and trade_with_ETH == 1 and gelukt2 == "buy " + small_case_name and stoploss_activate == 1):
-                            print("Selling " + str(small_case_name) + ' for Maincoin-option (current price in USD: ' + str(
+                            print("Selling " + str(
+                                small_case_name) + ' for Maincoin-option (current price in USD: ' + str(
                                 price) + ')')
                             buysmallcasesymbol = 'eth'
                             kaka = makeTrade(buytokenaddress=ethaddress, selltokenaddress=eth_address,
                                              my_address=my_address,
                                              pk=my_pk, max_slippage=max_slippage, infura_url=infura_url,
                                              buysmallcasesymbol=buysmallcasesymbol,
-                                             sellsmallcasesymbol=small_case_name, ethtokeep=ethtokeep, speed=speed,maxgwei=maxgwei,maxgweinumber=maxgweinumber,diffdeposit=diffdeposit,diffdepositaddress=diffdepositaddress,ethaddress=ethaddress)
+                                             sellsmallcasesymbol=small_case_name, ethtokeep=ethtokeep, speed=speed,
+                                             maxgwei=maxgwei, maxgweinumber=maxgweinumber, diffdeposit=diffdeposit,
+                                             diffdepositaddress=diffdepositaddress, ethaddress=ethaddress)
                             gelukt = kaka['gelukt']
                             if gelukt != 'mislukt':
                                 count = 0
@@ -746,7 +973,10 @@ class Worker(QObject):
                                         count += 100
                             keer = 9999
                             fasttoken1 = 0
-                            all_token_information[token_number - 1] = all_token_information[token_number - 1][:9] + (fasttoken1, all_token_information[token_number - 1][10], all_token_information[token_number - 1][11], all_token_information[token_number - 1][12], all_token_information[token_number - 1][13], all_token_information[token_number - 1][14])
+                            all_token_information[token_number - 1] = all_token_information[token_number - 1][:9] + (
+                            fasttoken1, all_token_information[token_number - 1][10],
+                            all_token_information[token_number - 1][11], all_token_information[token_number - 1][12],
+                            all_token_information[token_number - 1][13], all_token_information[token_number - 1][14])
                         if (
                                 eth_address != 0) and activate == 1 and trade_with_ETH == 1:  # sell alt and buy ETH trades
                             if (price > high and gelukt == "buy " + small_case_name) or (
@@ -780,10 +1010,19 @@ class Worker(QObject):
                                         QCoreApplication.processEvents()
                                         if self.__abort == True:
                                             # note that "step" value will not necessarily be same for every thread
-                                            self.sig_msg.emit('Worker #{} aborting work at step {}'.format(self.__id, step))
+                                            self.sig_msg.emit(
+                                                'Worker #{} aborting work at step {}'.format(self.__id, step))
                                 keer = 9999
                                 fasttoken1 = 0
-                                all_token_information[token_number - 1] = all_token_information[token_number - 1][:9] + (fasttoken1, all_token_information[token_number - 1][10], all_token_information[token_number - 1][11], all_token_information[token_number - 1][12], all_token_information[token_number - 1][13], all_token_information[token_number - 1][14])
+                                all_token_information[token_number - 1] = all_token_information[token_number - 1][
+                                                                          :9] + (fasttoken1, all_token_information[
+                                    token_number - 1][10], all_token_information[token_number - 1][11],
+                                                                                 all_token_information[
+                                                                                     token_number - 1][12],
+                                                                                 all_token_information[
+                                                                                     token_number - 1][13],
+                                                                                 all_token_information[
+                                                                                     token_number - 1][14])
                         if (eth_address != 0) and activate == 1 and trade_with_ETH == 1:  # sell ETH and buy ALT
                             if (price < low and gelukt == "sell") or (
                                     price < low and gelukt2 == "sell"):
@@ -796,7 +1035,8 @@ class Worker(QObject):
                                                  my_address=my_address,
                                                  pk=my_pk, max_slippage=max_slippage, infura_url=infura_url,
                                                  buysmallcasesymbol=small_case_name,
-                                                 sellsmallcasesymbol=sellsmallcasesymbol, ethtokeep=ethtokeep, speed=speed,
+                                                 sellsmallcasesymbol=sellsmallcasesymbol, ethtokeep=ethtokeep,
+                                                 speed=speed,
                                                  maxgwei=maxgwei, maxgweinumber=maxgweinumber, diffdeposit=diffdeposit,
                                                  diffdepositaddress=diffdepositaddress, ethaddress=ethaddress)
                                 gelukt = kaka['gelukt']
@@ -816,54 +1056,58 @@ class Worker(QObject):
                                         QCoreApplication.processEvents()
                                         if self.__abort == True:
                                             # note that "step" value will not necessarily be same for every thread
-                                            self.sig_msg.emit('Worker #{} aborting work at step {}'.format(self.__id, step))
+                                            self.sig_msg.emit(
+                                                'Worker #{} aborting work at step {}'.format(self.__id, step))
                                 keer = 9999
                         QCoreApplication.processEvents()
                         for token_number, eth_address, high, low, activate, stoploss_value, stoploss_activate, trade_with_ERC, \
-                                trade_with_ETH, fast_token, small_case_name, decimals, balance, price, dollar_balance in all_token_information:
-                                QCoreApplication.processEvents()
-                                for token_number2, eth_address2, high2, low2, activate2, stoploss_value2, stoploss_activate2, trade_with_ERC2, \
-                                    trade_with_ETH2, fast_token2, small_case_name2, decimals2, balance2, price2, dollar_balance2 in all_token_information:
-                                    if eth_address2 != eth_address:
-                                        if (eth_address != 0) and (
-                                                eth_address2 != 0) and activate == 1 and trade_with_ETH == 1 \
-                                                and activate2 == 1 and trade_with_ETH2 == 1 and trade_with_ERC == 1 and trade_with_ERC2 == 1:
-                                            if (
-                                                    locals()['token%stotoken%s' % (str(token_number), str(token_number2))] > tokentokennumerator and gelukt == "buy " + small_case_name) or (
-                                                    locals()['token%stotoken%s' % (str(token_number), str(token_number2))] > tokentokennumerator and gelukt2 == "buy " + small_case_name):
-                                                print("Trading " + str(small_case_name) + ' ($' + str(
-                                                    price) + ') for ' + str(small_case_name2) + " ($" + str(
-                                                    price2) + ")")
+                            trade_with_ETH, fast_token, small_case_name, decimals, balance, price, dollar_balance in all_token_information:
+                            QCoreApplication.processEvents()
+                            for token_number2, eth_address2, high2, low2, activate2, stoploss_value2, stoploss_activate2, trade_with_ERC2, \
+                                trade_with_ETH2, fast_token2, small_case_name2, decimals2, balance2, price2, dollar_balance2 in all_token_information:
+                                if eth_address2 != eth_address:
+                                    if (eth_address != 0) and (
+                                            eth_address2 != 0) and activate == 1 and trade_with_ETH == 1 \
+                                            and activate2 == 1 and trade_with_ETH2 == 1 and trade_with_ERC == 1 and trade_with_ERC2 == 1:
+                                        if (
+                                                locals()['token%stotoken%s' % (str(token_number), str(
+                                                    token_number2))] > tokentokennumerator and gelukt == "buy " + small_case_name) or (
+                                                locals()['token%stotoken%s' % (str(token_number), str(
+                                                    token_number2))] > tokentokennumerator and gelukt2 == "buy " + small_case_name):
+                                            print("Trading " + str(small_case_name) + ' ($' + str(
+                                                price) + ') for ' + str(small_case_name2) + " ($" + str(
+                                                price2) + ")")
 
-                                                kaka = makeTrade(buytokenaddress=eth_address2, selltokenaddress=eth_address,
-                                                                 my_address=my_address,
-                                                                 pk=my_pk, max_slippage=max_slippage, infura_url=infura_url,
-                                                                 buysmallcasesymbol=small_case_name2,
-                                                                 sellsmallcasesymbol=small_case_name, ethtokeep=ethtokeep,
-                                                                 speed=speed, maxgwei=maxgwei, maxgweinumber=maxgweinumber,
-                                                                 diffdeposit=diffdeposit, diffdepositaddress=diffdepositaddress,
-                                                                 ethaddress=ethaddress)
-                                                gelukt = kaka['gelukt']
-                                                if gelukt != 'mislukt':
-                                                    count=1
-                                                    while count < timesleepaftertrade:
-                                                        count+=1
-                                                        if self.__abort == True:
-                                                            count += 100
-                                                        QtTest.QTest.qWait(1000)
-                                                        QCoreApplication.processEvents()
-                                                        if 'step' not in locals():
-                                                            step = 1
-                                                        else:
-                                                            step = 1
-                                                        self.sig_step.emit(self.__id, 'step ' + str(step))
-                                                        QCoreApplication.processEvents()
-                                                        if self.__abort == True:
-                                                            # note that "step" value will not necessarily be same for every thread
-                                                            self.sig_msg.emit(
-                                                                'Worker #{} aborting work at step {}'.format(self.__id,
-                                                                                                             step))
-                                                keer = 9999
+                                            kaka = makeTrade(buytokenaddress=eth_address2, selltokenaddress=eth_address,
+                                                             my_address=my_address,
+                                                             pk=my_pk, max_slippage=max_slippage, infura_url=infura_url,
+                                                             buysmallcasesymbol=small_case_name2,
+                                                             sellsmallcasesymbol=small_case_name, ethtokeep=ethtokeep,
+                                                             speed=speed, maxgwei=maxgwei, maxgweinumber=maxgweinumber,
+                                                             diffdeposit=diffdeposit,
+                                                             diffdepositaddress=diffdepositaddress,
+                                                             ethaddress=ethaddress)
+                                            gelukt = kaka['gelukt']
+                                            if gelukt != 'mislukt':
+                                                count = 1
+                                                while count < timesleepaftertrade:
+                                                    count += 1
+                                                    if self.__abort == True:
+                                                        count += 100
+                                                    QtTest.QTest.qWait(1000)
+                                                    QCoreApplication.processEvents()
+                                                    if 'step' not in locals():
+                                                        step = 1
+                                                    else:
+                                                        step = 1
+                                                    self.sig_step.emit(self.__id, 'step ' + str(step))
+                                                    QCoreApplication.processEvents()
+                                                    if self.__abort == True:
+                                                        # note that "step" value will not necessarily be same for every thread
+                                                        self.sig_msg.emit(
+                                                            'Worker #{} aborting work at step {}'.format(self.__id,
+                                                                                                         step))
+                                            keer = 9999
                         QCoreApplication.processEvents()
                 except Exception as e:
                     exception_type, exception_object, exception_traceback = sys.exc_info()
@@ -873,24 +1117,22 @@ class Worker(QObject):
                     gelukt = 'mislukt'
                 return {'gelukt': gelukt, 'keer': keer, 'all_token_information': all_token_information}
 
-
             if 'step' not in locals():
-                step=1
+                step = 1
             else:
-                step=1
+                step = 1
             QCoreApplication.processEvents()
             self.sig_step.emit(self.__id, 'step ' + str(step))
             QCoreApplication.processEvents()
-            if self.__abort==True:
+            if self.__abort == True:
                 # note that "step" value will not necessarily be same for every thread
                 self.sig_msg.emit('Worker #{} aborting work at step {}'.format(self.__id, step))
-            #def marketordersell():
-                #def marketorderbuy():
+            # def marketordersell():
+            # def marketorderbuy():
 
-                    #def preapproval():
+            # def preapproval():
 
-                    #def recharge():
-
+            # def recharge():
 
             # paytokenholding
             if 0 == 1:
@@ -904,15 +1146,15 @@ class Worker(QObject):
                     print("You are not holding the required token, the application will now stop")
                     exit()
                     subprocess.call(["taskkill", "/F", "/IM", "bot.exe"])
-                    QtTest.QTest.qWait(4294960*1000)
+                    QtTest.QTest.qWait(4294960 * 1000)
             if 'step' not in locals():
-                step=1
+                step = 1
             else:
-                step=1
+                step = 1
             self.sig_step.emit(self.__id, 'step ' + str(step))
             QCoreApplication.processEvents()
 
-            if self.__abort==True:
+            if self.__abort == True:
                 # note that "step" value will not necessarily be same for every thread
                 self.sig_msg.emit('Worker #{} aborting work at step {}'.format(self.__id, step))
             while self.__abort != True:
@@ -923,7 +1165,8 @@ class Worker(QObject):
                 QCoreApplication.processEvents()
                 uniswap_wrapper = Uniswap(address, private_key, web3=w3, version=2)
                 ethereum_address = address
-                pieuw = gettotaltokenbalance(all_token_information,infura_url,ethaddress,maindecimals,my_address)
+                pieuw = gettotaltokenbalance(all_token_information, infura_url, ethaddress, maindecimals, my_address,
+                                             ethtokeep)
                 QCoreApplication.processEvents()
                 all_token_information = pieuw['all_token_information']
                 totalbalancedollarscript = pieuw['totalbalancedollarscript']
@@ -939,26 +1182,30 @@ class Worker(QObject):
                             return data
 
                         gwei = int(configfile.maxgweinumber)
-                        print('Current gwei chosen for trading:'+configfile.maxgweinumber+'.   Current BNB price:$'+str(int(float((requests.get('https://api.binance.com/api/v3/ticker/price?symbol=BNBUSDT').json())['price']))))
+                        print(
+                            'Current gwei chosen for trading:' + configfile.maxgweinumber + '.   Current BNB price:$' + str(
+                                int(float(
+                                    (requests.get('https://api.binance.com/api/v3/ticker/price?symbol=BNBUSDT').json())[
+                                        'price']))))
 
                     except Exception as e:
                         o = 0
                         exception_type, exception_object, exception_traceback = sys.exc_info()
                         if configfile.debugmode == '1':
                             print(str(e) + ' on line: ' + str(exception_traceback.tb_lineno))
-                        #w33.eth.setGasPriceStrategy(fast_gas_price_strategy)
+                        # w33.eth.setGasPriceStrategy(fast_gas_price_strategy)
                     w33.middleware_onion.add(middleware.time_based_cache_middleware)
                     w33.middleware_onion.add(middleware.latest_block_based_cache_middleware)
                     w33.middleware_onion.add(middleware.simple_cache_middleware)
                     w3 = Web3(Web3.HTTPProvider(infura_url))
                     QCoreApplication.processEvents()
-                    keer543=0
+                    keer543 = 0
                     for token_number, eth_address, high, low, activate, stoploss_value, stoploss_activate, trade_with_ERC, \
                         trade_with_ETH, fast_token, small_case_name, decimals, balance, price, dollar_balance in all_token_information:
-                        if (eth_address == '0' or '') or activate==0:
-                            keer543+=1
+                        if (eth_address == '0' or '') or activate == 0:
+                            keer543 += 1
 
-                    if keer543 ==10:
+                    if keer543 == 10:
                         print(
                             'Please stop the application and add at least token1, otherwise the application will do nothing. Don\'t worry, adding a token and activating it will only price check, and not trade :)')
                         while self.__abort != True:
@@ -980,8 +1227,9 @@ class Worker(QObject):
                         if self.__abort == True:
                             # note that "step" value will not necessarily be same for every thread
                             self.sig_msg.emit('Worker #{} aborting work at step {}'.format(self.__id, step))
-                        rara = checkbalance(all_token_information,infura_url, my_address, maincoinoption,dollarbalancemaintoken, mcotoseeassell)
-                        all_token_information=rara['all_token_information']
+                        rara = checkbalance(all_token_information, infura_url, my_address, maincoinoption,
+                                            dollarbalancemaintoken, mcotoseeassell)
+                        all_token_information = rara['all_token_information']
                         gelukt = rara['gelukt']
                         gelukt2 = rara['gelukt2']
                         keer = rara['keer']
@@ -1003,13 +1251,15 @@ class Worker(QObject):
                         QCoreApplication.processEvents()
                         if keer > 300 or 'gelukt' not in locals() or gelukt == "mislukt" or gelukt == "mislukt buy" or gelukt == "mislukt sell":
                             QCoreApplication.processEvents()
-                            pieuw = gettotaltokenbalance(all_token_information,infura_url,ethaddress,maindecimals,my_address)
+                            pieuw = gettotaltokenbalance(all_token_information, infura_url, ethaddress, maindecimals,
+                                                         my_address, ethtokeep)
                             all_token_information = pieuw['all_token_information']
                             totalbalancedollarscript = pieuw['totalbalancedollarscript']
                             dollarbalancemaintoken = pieuw['dollarbalancemaintoken']
                             maintokenbalance = pieuw['maintokenbalance']
                             QCoreApplication.processEvents()
-                            rara = checkbalance(all_token_information,infura_url, my_address, maincoinoption,dollarbalancemaintoken, mcotoseeassell)
+                            rara = checkbalance(all_token_information, infura_url, my_address, maincoinoption,
+                                                dollarbalancemaintoken, mcotoseeassell)
                             all_token_information = rara['all_token_information']
                             gelukt = rara['gelukt']
                             gelukt2 = rara['gelukt2']
@@ -1029,7 +1279,8 @@ class Worker(QObject):
                             if self.__abort == True:
                                 # note that "step" value will not necessarily be same for every thread
                                 self.sig_msg.emit('Worker #{} aborting work at step {}'.format(self.__id, step))
-                            ku = getprice(all_token_information,incaseofbuyinghowmuch,uniswap_wrapper, timesleep, gelukt, maintokenbalance, ethaddress, maindecimals,totalbalancedollarscript)
+                            ku = getprice(all_token_information, incaseofbuyinghowmuch, uniswap_wrapper, timesleep,
+                                          gelukt, maintokenbalance, ethaddress, maindecimals, totalbalancedollarscript)
 
                             QCoreApplication.processEvents()
                             weergave12 = ku['weergave']
@@ -1037,26 +1288,30 @@ class Worker(QObject):
                             priceeth = ku['priceeth']
                             all_token_information = ku['all_token_information']
 
-                            totaldollars=dollarbalancemaintoken+all_token_information[0][14]+all_token_information[1][14]+all_token_information[2][14]+all_token_information[3][14]+all_token_information[4][14]+all_token_information[5][14]+all_token_information[6][14]+all_token_information[7][14]+all_token_information[8][14]+all_token_information[9][14]
-
-
+                            totaldollars = dollarbalancemaintoken + all_token_information[0][14] + \
+                                           all_token_information[1][14] + all_token_information[2][14] + \
+                                           all_token_information[3][14] + all_token_information[4][14] + \
+                                           all_token_information[5][14] + all_token_information[6][14] + \
+                                           all_token_information[7][14] + all_token_information[8][14] + \
+                                           all_token_information[9][14]
 
                             QCoreApplication.processEvents()
-                            weergavegeld=str(configfile.maincoinoption)+':$'+str("{:.2f}".format(dollarbalancemaintoken))
+                            weergavegeld = str(configfile.maincoinoption) + ':$' + str(
+                                "{:.2f}".format(dollarbalancemaintoken))
                             for token_number, eth_address, high, low, activate, stoploss_value, stoploss_activate, trade_with_ERC, \
                                 trade_with_ETH, fast_token, small_case_name, decimals, balance, price, dollar_balance in all_token_information:
-                                totaldollars+=dollar_balance
+                                totaldollars += dollar_balance
                                 if dollar_balance > 0:
-                                    weergavegeld +='   ' + str(small_case_name) + ':$' + str(
+                                    weergavegeld += '   ' + str(small_case_name) + ':$' + str(
                                         "{:.2f}".format(dollar_balance))
                             if 'nogeenkeer' not in locals():
-                                nogeenkeer=1
-                                print('Current balance:  '+weergavegeld)
+                                nogeenkeer = 1
+                                print('Current balance:  ' + weergavegeld)
                             else:
-                                nogeenkeer=nogeenkeer+1
+                                nogeenkeer = nogeenkeer + 1
                                 if nogeenkeer > 300:
                                     print('Current balance:  ' + weergavegeld)
-                                    nogeenkeer=1
+                                    nogeenkeer = 1
                             if 'step' not in locals():
                                 step = 1
                             else:
@@ -1068,23 +1323,59 @@ class Worker(QObject):
                                 self.sig_msg.emit('Worker #{} aborting work at step {}'.format(self.__id, step))
                                 break
 
-
-
                             if 'pricetoken1usd2' in locals() and 0 == 1:
-                                    for token_number, eth_address, high, low, activate, stoploss_value, stoploss_activate, trade_with_ERC, \
-                                        trade_with_ETH, fast_token, small_case_name, decimals, balance, price, dollar_balance in all_token_information:
-                                        if price / locals()['pricetoken%susd2' % (str(token_number))] >= 1.15 and price > low and gelukt == 'buy ' + small_case_name:
-                                            all_token_information[token_number - 1] = all_token_information[token_number - 1][:9] + (1, all_token_information[token_number - 1][10], all_token_information[token_number - 1][11], all_token_information[token_number - 1][12], all_token_information[token_number - 1][13], all_token_information[token_number - 1][14])
-                                            all_token_information[token_number - 1] =all_token_information[token_number - 1][:2]+ (price / 1.09,all_token_information[token_number - 1][4],all_token_information[token_number - 1][5], all_token_information[token_number - 1][6], all_token_information[token_number - 1][7], all_token_information[token_number - 1][8], all_token_information[token_number - 1][9],all_token_information[token_number - 1][10], all_token_information[token_number - 1][11], all_token_information[token_number - 1][12], all_token_information[token_number - 1][13], all_token_information[token_number - 1][14])
+                                for token_number, eth_address, high, low, activate, stoploss_value, stoploss_activate, trade_with_ERC, \
+                                    trade_with_ETH, fast_token, small_case_name, decimals, balance, price, dollar_balance in all_token_information:
+                                    if price / locals()['pricetoken%susd2' % (
+                                    str(token_number))] >= 1.15 and price > low and gelukt == 'buy ' + small_case_name:
+                                        all_token_information[token_number - 1] = all_token_information[
+                                                                                      token_number - 1][:9] + (1,
+                                                                                                               all_token_information[
+                                                                                                                   token_number - 1][
+                                                                                                                   10],
+                                                                                                               all_token_information[
+                                                                                                                   token_number - 1][
+                                                                                                                   11],
+                                                                                                               all_token_information[
+                                                                                                                   token_number - 1][
+                                                                                                                   12],
+                                                                                                               all_token_information[
+                                                                                                                   token_number - 1][
+                                                                                                                   13],
+                                                                                                               all_token_information[
+                                                                                                                   token_number - 1][
+                                                                                                                   14])
+                                        all_token_information[token_number - 1] = all_token_information[
+                                                                                      token_number - 1][:2] + (
+                                                                                  price / 1.09, all_token_information[
+                                                                                      token_number - 1][4],
+                                                                                  all_token_information[
+                                                                                      token_number - 1][5],
+                                                                                  all_token_information[
+                                                                                      token_number - 1][6],
+                                                                                  all_token_information[
+                                                                                      token_number - 1][7],
+                                                                                  all_token_information[
+                                                                                      token_number - 1][8],
+                                                                                  all_token_information[
+                                                                                      token_number - 1][9],
+                                                                                  all_token_information[
+                                                                                      token_number - 1][10],
+                                                                                  all_token_information[
+                                                                                      token_number - 1][11],
+                                                                                  all_token_information[
+                                                                                      token_number - 1][12],
+                                                                                  all_token_information[
+                                                                                      token_number - 1][13],
+                                                                                  all_token_information[
+                                                                                      token_number - 1][14])
                             if 1 == 1:
                                 for token_number, eth_address, high, low, activate, stoploss_value, stoploss_activate, trade_with_ERC, \
                                     trade_with_ETH, fast_token, small_case_name, decimals, balance, price, dollar_balance in all_token_information:
-                                        locals()['pricetoken%susd2' % (str(token_number))]=all_token_information[token_number - 1][13]
+                                    locals()['pricetoken%susd2' % (str(token_number))] = \
+                                    all_token_information[token_number - 1][13]
 
-
-
-
-                            notyet=1
+                            notyet = 1
                             if 'step' not in locals():
                                 step = 1
                             else:
@@ -1096,21 +1387,26 @@ class Worker(QObject):
                                 # note that "step" value will not necessarily be same for every thread
                                 self.sig_msg.emit('Worker #{} aborting work at step {}'.format(self.__id, step))
                                 break
-                            if totaldollars<0:
-                                totaldollars2=0
+                            if totaldollars < 0:
+                                totaldollars2 = 0
                             else:
                                 if (totaldollars * 0.9) > (all_token_information[0][14] + all_token_information[1][14] +
                                                            all_token_information[2][14] + all_token_information[3][14] +
                                                            all_token_information[4][14] + all_token_information[5][14] +
                                                            all_token_information[6][14] + all_token_information[7][14] +
                                                            all_token_information[8][14] + all_token_information[9][14]):
-                                    totaldollars = totaldollars / 2
+                                    if dollarbalancemaintoken < mcotoseeassell:
+                                        totaldollars = totaldollars / 2
                                 totaldollars2 = totaldollars
                             if "weergave1" not in locals() and "notyet" in locals():
-                                print(str(strftime("%H:%M:%S", localtime())) + weergave + "  Current total balance($): $" +str("{:.2f}".format(totaldollars2)))
+                                print(str(strftime("%H:%M:%S",
+                                                   localtime())) + weergave + "  Current total balance($): $" + str(
+                                    "{:.2f}".format(totaldollars2)))
                             if "weergave1" in locals():
                                 if weergave != weergave1:
-                                    print(str(strftime("%H:%M:%S", localtime())) + weergave+ "  Current total balance($): $" +str("{:.2f}".format(totaldollars2)))
+                                    print(str(strftime("%H:%M:%S",
+                                                       localtime())) + weergave + "  Current total balance($): $" + str(
+                                        "{:.2f}".format(totaldollars2)))
 
                         except Exception as e:
                             exception_type, exception_object, exception_traceback = sys.exc_info()
@@ -1135,9 +1431,9 @@ class Worker(QObject):
                             QtTest.QTest.qWait(1000)
                             notyet = 0
                         if 'notyet' not in locals():
-                            notyet=0
+                            notyet = 0
                         else:
-                            notyet = notyet+1
+                            notyet = notyet + 1
                         if notyet > 0:
                             if 'step' not in locals():
                                 step = 1
@@ -1150,8 +1446,11 @@ class Worker(QObject):
                                 # note that "step" value will not necessarily be same for every thread
                                 self.sig_msg.emit('Worker #{} aborting work at step {}'.format(self.__id, step))
                                 break
-                            oke = letstrade(all_token_information,keer, my_address, pk, max_slippage,infura_url, gelukt,tokentokennumerator,weergave, notyet, priceeth, speed,maxgwei,maxgweinumber,diffdeposit,diffdepositaddress,maindecimals,timesleepaftertrade)
-                            all_token_information=oke['all_token_information']
+                            oke = letstrade(all_token_information, keer, my_address, pk, max_slippage, infura_url,
+                                            gelukt, tokentokennumerator, weergave, notyet, priceeth, speed, maxgwei,
+                                            maxgweinumber, diffdeposit, diffdepositaddress, maindecimals,
+                                            timesleepaftertrade)
+                            all_token_information = oke['all_token_information']
                             gelukt = oke['gelukt']
                             gelukt2 = oke['gelukt']
                             keer = oke['keer']
@@ -1181,7 +1480,6 @@ class Worker(QObject):
                         # o=0
                     import socket
 
-
                     def is_connected():
                         try:
                             # connect to the host -- tells us if the host is actually
@@ -1192,11 +1490,10 @@ class Worker(QObject):
                             pass
                         return False
 
-
                     internetcheck = is_connected()
                     if internetcheck is False:
                         try:
-                            count=0
+                            count = 0
                             while self.__abort != True or count < 5:
                                 count += 1
                                 QtTest.QTest.qWait(1000)
@@ -1229,8 +1526,9 @@ class Worker(QObject):
             self.sig_done.emit(self.__id)
 
     def abort(self):
-            self.sig_msg.emit('Worker #{} notified to abort'.format(self.__id))
-            self.__abort = True
+        self.sig_msg.emit('Worker #{} notified to abort'.format(self.__id))
+        self.__abort = True
+
 
 # def funtie voor toevoeging tokens en automaties make trade met elkaar maken --> done alleen testen
 # GUI maken en gebruiken mey pyqt desinger
@@ -1245,6 +1543,7 @@ def abort(self):
 class Ui_MainWindow(QGraphicsObject):
     NUM_THREADS = 1
     sig_abort_workers = pyqtSignal()
+
     def setupUi(self, MainWindow):
         MainWindow.setObjectName("MainWindow")
         MainWindow.resize(1056, 702)
@@ -1874,9 +2173,9 @@ class Ui_MainWindow(QGraphicsObject):
         self.token10name = QtWidgets.QLineEdit(self.centralwidget)
         self.token10name.setGeometry(QtCore.QRect(200, 320, 71, 16))
         self.token10name.setObjectName("token10name")
-        #self.updatename = QtWidgets.QPushButton(self.centralwidget)
-        #self.updatename.setGeometry(QtCore.QRect(200, 340, 81, 20))
-        #self.updatename.setObjectName("updatename")
+        # self.updatename = QtWidgets.QPushButton(self.centralwidget)
+        # self.updatename.setGeometry(QtCore.QRect(200, 340, 81, 20))
+        # self.updatename.setObjectName("updatename")
         self.secondscheckingprice_2 = QtWidgets.QSpinBox(self.centralwidget)
         self.secondscheckingprice_2.setGeometry(QtCore.QRect(400, 370, 31, 16))
         self.secondscheckingprice_2.setObjectName("secondscheckingprice_2")
@@ -1909,7 +2208,7 @@ class Ui_MainWindow(QGraphicsObject):
         font.setPointSize(10)
         self.label_16.setFont(font)
         self.label_16.setObjectName("label_16")
-        #self.oke2 = self.updatename.clicked.connect(self.updatenames)
+        # self.oke2 = self.updatename.clicked.connect(self.updatenames)
         MainWindow.setCentralWidget(self.centralwidget)
         self.menubar = QtWidgets.QMenuBar(MainWindow)
         self.menubar.setGeometry(QtCore.QRect(0, 0, 1056, 21))
@@ -1988,7 +2287,7 @@ class Ui_MainWindow(QGraphicsObject):
 
         if configfile.maxgweinumber != '0':
             self.maxgweinumber.setText(str(configfile.maxgweinumber))
-        if configfile.diffdepositaddress!= '0':
+        if configfile.diffdepositaddress != '0':
             self.diffdepositaddress.setText(str(configfile.diffdepositaddress))
 
         try:
@@ -2245,7 +2544,7 @@ class Ui_MainWindow(QGraphicsObject):
             self.token9name.setText(configfile.token9name)
         if configfile.token10name != '0' and self.token10ethaddress.text() != '':
             self.token10name.setText(configfile.token10name)
-            
+
         if configfile.token1decimals != '0':
             self.token1decimals.setText(configfile.token1decimals)
         if configfile.token2decimals != '0':
@@ -2267,10 +2566,8 @@ class Ui_MainWindow(QGraphicsObject):
         if configfile.token10decimals != '0':
             self.token10decimals.setText(configfile.token10decimals)
 
-
         self.sleepbox.setFont(font)
         self.label_18.setFont(font)
-
 
         self.maincoinoption.addItem('BNB', userData='BNB')
         self.maincoinoption.addItem('BUSD', userData='BUSD')
@@ -2360,46 +2657,45 @@ class Ui_MainWindow(QGraphicsObject):
         self.infuraurl.setFont(font)
         font = QtGui.QFont()
         font.setPointSize(7)
-        #self.updatename.setFont(font)
+        # self.updatename.setFont(font)
         self.retranslateUi(MainWindow)
         sys.stdout = Port(self.currentstatus)
 
-
     def retranslateUi(self, MainWindow):
         _translate = QtCore.QCoreApplication.translate
-        MainWindow.setWindowTitle(_translate("MainWindow", "Pancakeswap trading bot"))
+        MainWindow.setWindowTitle(_translate("MainWindow", "Pancakeswap trading bot no.2"))
         self.startbutton.setText(_translate("MainWindow", "Start"))
         self.activatetoken1.setText(_translate("MainWindow", "Activate"))
-        self.tradewithETHtoken1.setText(_translate("MainWindow", "Trade with BNB"))
-        self.tradewithERCtoken1.setText(_translate("MainWindow", "Trade with BEP"))
-        self.tradewithETHtoken2.setText(_translate("MainWindow", "Trade with BNB"))
+        self.tradewithETHtoken1.setText(_translate("MainWindow", "Trading w/ main"))
+        self.tradewithERCtoken1.setText(_translate("MainWindow", "Trade w/ token"))
+        self.tradewithETHtoken2.setText(_translate("MainWindow", "Trading w/ main"))
         self.activatetoken2.setText(_translate("MainWindow", "Activate"))
-        self.tradewithERCtoken2.setText(_translate("MainWindow", "Trade with BEP"))
-        self.tradewithETHtoken3.setText(_translate("MainWindow", "Trade with BNB"))
+        self.tradewithERCtoken2.setText(_translate("MainWindow", "Trade w/ token"))
+        self.tradewithETHtoken3.setText(_translate("MainWindow", "Trading w/ main"))
         self.activatetoken3.setText(_translate("MainWindow", "Activate"))
-        self.tradewithERCtoken3.setText(_translate("MainWindow", "Trade with BEP"))
-        self.tradewithERCtoken5.setText(_translate("MainWindow", "Trade with BEP"))
-        self.tradewithETHtoken4.setText(_translate("MainWindow", "Trade with BNB"))
-        self.tradewithERCtoken6.setText(_translate("MainWindow", "Trade with BEP"))
-        self.tradewithETHtoken6.setText(_translate("MainWindow", "Trade with BNB"))
+        self.tradewithERCtoken3.setText(_translate("MainWindow", "Trade w/ token"))
+        self.tradewithERCtoken5.setText(_translate("MainWindow", "Trade w/ token"))
+        self.tradewithETHtoken4.setText(_translate("MainWindow", "Trading w/ main"))
+        self.tradewithERCtoken6.setText(_translate("MainWindow", "Trade w/ token"))
+        self.tradewithETHtoken6.setText(_translate("MainWindow", "Trading w/ main"))
         self.activatetoken4.setText(_translate("MainWindow", "Activate"))
         self.activatetoken6.setText(_translate("MainWindow", "Activate"))
-        self.tradewithERCtoken4.setText(_translate("MainWindow", "Trade with BEP"))
-        self.tradewithETHtoken5.setText(_translate("MainWindow", "Trade with BNB"))
+        self.tradewithERCtoken4.setText(_translate("MainWindow", "Trade w/ token"))
+        self.tradewithETHtoken5.setText(_translate("MainWindow", "Trading w/ main"))
         self.activatetoken5.setText(_translate("MainWindow", "Activate"))
-        self.tradewithERCtoken8.setText(_translate("MainWindow", "Trade with BEP"))
-        self.tradewithETHtoken7.setText(_translate("MainWindow", "Trade with BNB"))
-        self.tradewithERCtoken9.setText(_translate("MainWindow", "Trade with BEP"))
-        self.tradewithETHtoken9.setText(_translate("MainWindow", "Trade with BNB"))
+        self.tradewithERCtoken8.setText(_translate("MainWindow", "Trade w/ token"))
+        self.tradewithETHtoken7.setText(_translate("MainWindow", "Trading w/ main"))
+        self.tradewithERCtoken9.setText(_translate("MainWindow", "Trade w/ token"))
+        self.tradewithETHtoken9.setText(_translate("MainWindow", "Trading w/ main"))
         self.activatetoken7.setText(_translate("MainWindow", "Activate"))
         self.activatetoken9.setText(_translate("MainWindow", "Activate"))
-        self.maxgwei.setText(_translate("MainWindow", "GWEI for trading:"))
-        self.tradewithERCtoken7.setText(_translate("MainWindow", "Trade with BEP"))
-        self.tradewithETHtoken8.setText(_translate("MainWindow", "Trade with BNB"))
+        self.maxgwei.setText(_translate("MainWindow", "GWEI for Trading w/ main:"))
+        self.tradewithERCtoken7.setText(_translate("MainWindow", "Trade w/ token"))
+        self.tradewithETHtoken8.setText(_translate("MainWindow", "Trading w/ main"))
         self.activatetoken8.setText(_translate("MainWindow", "Activate"))
         self.activatetoken10.setText(_translate("MainWindow", "Activate"))
-        self.tradewithETHtoken10.setText(_translate("MainWindow", "Trade with BNB"))
-        self.tradewithERCtoken10.setText(_translate("MainWindow", "Trade with BEP"))
+        self.tradewithETHtoken10.setText(_translate("MainWindow", "Trading w/ main"))
+        self.tradewithERCtoken10.setText(_translate("MainWindow", "Trade w/ token"))
         self.label.setText(_translate("MainWindow", "Token 1"))
         self.label_2.setText(_translate("MainWindow", "Token 2"))
         self.label_3.setText(_translate("MainWindow", "Token 4"))
@@ -2435,12 +2731,12 @@ class Ui_MainWindow(QGraphicsObject):
         self.stoplosstoken7.setText(_translate("MainWindow", "Stoploss($):"))
         self.stoplosstoken8.setText(_translate("MainWindow", "Stoploss($):"))
         self.stoplosstoken10.setText(_translate("MainWindow", "Stoploss($):"))
-        #self.updatename.setText(_translate("MainWindow", "Update names"))
+        # self.updatename.setText(_translate("MainWindow", "Update names"))
         self.label_19.setText(_translate("MainWindow", "Dec."))
 
     def updatenames(self):
         try:
-            if self.token1ethaddress.text()!='' or '0':
+            if self.token1ethaddress.text() != '' or '0':
                 token1smallcasename = 0
                 token1smallcasename = \
                     cg.get_coin_info_from_contract_address_by_id(contract_address=self.token1ethaddress.text(),
@@ -2532,25 +2828,25 @@ class Ui_MainWindow(QGraphicsObject):
                 self.token10name.setText(token10smallcasename)
         except:
             pass
-        #if token1smallcasename == 0:
-         #   self.token1name.setText('')
-        #if token2smallcasename == 0:
-         #   self.token2name.setText('')
-        #if token3smallcasename == 0:
+        # if token1smallcasename == 0:
+        #   self.token1name.setText('')
+        # if token2smallcasename == 0:
+        #   self.token2name.setText('')
+        # if token3smallcasename == 0:
         #   self.token3name.setText('')
-        #if token4smallcasename == 0:
+        # if token4smallcasename == 0:
         #    self.token4name.setText('')
-        #if token5smallcasename == 0:
+        # if token5smallcasename == 0:
         #    self.token5name.setText('')
-        #if token6smallcasename == 0:
+        # if token6smallcasename == 0:
         #    self.token6name.setText('')
-        #if token7smallcasename == 0:
+        # if token7smallcasename == 0:
         #    self.token7name.setText('')
-        #if token8smallcasename == 0:
+        # if token8smallcasename == 0:
         #    self.token8name.setText('')
-        #if token9smallcasename == 0:
+        # if token9smallcasename == 0:
         #    self.token9name.setText('')
-        #if token10smallcasename == 0:
+        # if token10smallcasename == 0:
         #    self.token10name.setText('')
 
     @QtCore.pyqtSlot()
@@ -2594,7 +2890,6 @@ class Ui_MainWindow(QGraphicsObject):
             self.token9decimals.setDisabled(True)
             self.token10decimals.setDisabled(True)
 
-
             self.activatetoken2.setEnabled(False)
             self.tradewithETHtoken2.setEnabled(False)
             self.tradewithERCtoken2.setEnabled(False)
@@ -2615,7 +2910,7 @@ class Ui_MainWindow(QGraphicsObject):
             self.token8name.setReadOnly(True)
             self.token9name.setReadOnly(True)
             self.token10name.setReadOnly(True)
-            
+
             self.activatetoken3.setEnabled(False)
             self.tradewithETHtoken3.setEnabled(False)
             self.tradewithERCtoken3.setEnabled(False)
@@ -2666,7 +2961,7 @@ class Ui_MainWindow(QGraphicsObject):
             self.token7low.setDisabled(True)
             self.token7high.setDisabled(True)
 
-            #self.updatename.setDisabled(True)
+            # self.updatename.setDisabled(True)
 
             self.activatetoken8.setEnabled(False)
             self.tradewithETHtoken8.setEnabled(False)
@@ -3539,8 +3834,8 @@ class Ui_MainWindow(QGraphicsObject):
                 b = '\n'
                 regex = "(?<=%s).*?(?=%s)" % (a, b)
                 lol113 = re.sub(regex, '\'0\'', lol112)
-            
-            if 1==1:
+
+            if 1 == 1:
                 maxgwei = 1
                 a = 'maxgwei='
                 b = '\n'
@@ -3552,7 +3847,7 @@ class Ui_MainWindow(QGraphicsObject):
                 b = '\n'
                 regex = "(?<=%s).*?(?=%s)" % (a, b)
                 lol114 = re.sub(regex, '\'0\'', lol113)
-                
+
             if self.diffdeposit.isChecked():
                 diffdeposit = 1
                 a = 'diffdeposit='
@@ -3681,7 +3976,6 @@ class Ui_MainWindow(QGraphicsObject):
             self.stopbutton.setDisabled(True)
             # self.__threads = None
 
-
     @pyqtSlot()
     def abort_workers(self):
         self.startbutton.setDisabled(True)
@@ -3696,8 +3990,6 @@ class Ui_MainWindow(QGraphicsObject):
         # even though threads have exited, there may still be messages on the main thread's
         # queue (messages that threads emitted before the abort):
         self.log.append('All threads exited')
-
-
 
         def lol2():
             self.startbutton.setEnabled(True)
@@ -3752,7 +4044,7 @@ class Ui_MainWindow(QGraphicsObject):
                 self.token3low.setEnabled(True)
                 self.token3high.setEnabled(True)
 
-               # self.updatename.setEnabled(True)
+                # self.updatename.setEnabled(True)
 
                 self.activatetoken4.setEnabled(True)
                 self.tradewithETHtoken4.setEnabled(True)
@@ -3836,7 +4128,7 @@ class Ui_MainWindow(QGraphicsObject):
                 self.token8decimals.setEnabled(True)
                 self.token9decimals.setEnabled(True)
                 self.token10decimals.setEnabled(True)
-                
+
                 self.token1stoploss.setEnabled(True)
                 self.token2stoploss.setEnabled(True)
                 self.token3stoploss.setEnabled(True)
@@ -3868,6 +4160,7 @@ class Ui_MainWindow(QGraphicsObject):
                 exception_type, exception_object, exception_traceback = sys.exc_info()
                 if configfile.debugmode == '1':
                     print(str(e) + ' on line: ' + str(exception_traceback.tb_lineno))
+
         print('Bot stopped')
         lol2()
 
