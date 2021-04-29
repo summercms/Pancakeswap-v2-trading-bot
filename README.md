@@ -1,6 +1,8 @@
 # Pancakeswap v2 trading client
 A Pancakeswap trading client (and bot) with limit orders, stop-loss, custom gas strategies, a GUI and much more.
 
+If you have any questions or inquiries, you can contact me via telegram: <b>aviddot</b>
+
 ![alt text](https://raw.githubusercontent.com/aviddot/Pancakeswap-trading-bot/main/v1gif.gif "GIF application")
 
 <H2>Prerequisites</H2>
