@@ -1,5 +1,8 @@
 #!python
 # cython: language_level=3
+
+# Written by Aviddot: https://github.com/aviddot/Pancakeswap-v2-trading-bot
+
 import datetime
 from itertools import permutations
 import time
@@ -3858,7 +3861,7 @@ class Ui_MainWindow(QGraphicsObject):
     def on_worker_step(self, worker_id: int, data: str):
         self.log.append('Worker #{}: {}'.format(worker_id, data))
         self.progress.append('{}: {}'.format(worker_id, data))
-
+# Written by Aviddot: https://github.com/aviddot/Pancakeswap-v2-trading-bot
     @pyqtSlot(int)
     def on_worker_done(self, worker_id):
         self.log.append('worker #{} done'.format(worker_id))
@@ -3999,7 +4002,7 @@ class Ui_MainWindow(QGraphicsObject):
                 self.token9ethaddress.setEnabled(True)
                 self.token9low.setEnabled(True)
                 self.token9high.setEnabled(True)
-
+                # Written by Aviddot: https://github.com/aviddot/Pancakeswap-v2-trading-bot
                 self.activatetoken10.setEnabled(True)
                 self.tradewithETHtoken10.setEnabled(True)
                 self.tradewithERCtoken10.setEnabled(True)
@@ -4057,7 +4060,7 @@ class Ui_MainWindow(QGraphicsObject):
 
         print('Bot stopped')
         lol2()
-
+       
 
 if __name__ == "__main__":
     app = QtWidgets.QApplication(sys.argv)
@@ -4072,3 +4075,4 @@ if __name__ == "__main__":
         if configfile.debugmode == '1':
             print(str(e) + ' on line: ' + str(exception_traceback.tb_lineno))
     print(lollol2)
+# Written by Aviddot: https://github.com/aviddot/Pancakeswap-v2-trading-bot
