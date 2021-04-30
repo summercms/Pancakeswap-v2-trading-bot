@@ -1,6 +1,5 @@
 #!python
 # cython: language_level=3
-
 # Written by Aviddot: https://github.com/aviddot/Pancakeswap-v2-trading-bot
 
 import datetime
@@ -39,7 +38,7 @@ sys.setrecursionlimit(1500)
 QtWidgets.QApplication.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling, True)  # enable highdpi scaling
 QtWidgets.QApplication.setAttribute(QtCore.Qt.AA_UseHighDpiPixmaps, True)  # use highdpi icons
 
-
+# Written by Aviddot: https://github.com/aviddot/Pancakeswap-v2-trading-bot
 def __ne__(self, other):
     return not self.__eq__(other)
 
@@ -122,8 +121,7 @@ class Worker(QObject):
             mcotoseeassell = float(configfile.mcotoseeassell)
             debugmode = int(configfile.debugmode)
 
-
-
+            # Written by Aviddot: https://github.com/aviddot/Pancakeswap-v2-trading-bot
             ##for token_number,eth_address,high,low,activate,stoploss_value,stoploss_activate,trade_with_ERC,trade_with_ETH,fast_token in all_token_information:
             all_token_information = [
                 (1, str(configfile.token1ethaddress), float(configfile.token1high), float(configfile.token1low),
@@ -188,12 +186,8 @@ class Worker(QObject):
                         pass
                 if (ethtokeep > mcotoseeassell):
                     print(
-                        'Stop the script, the buy/sell boundary is lower than the $ to keep in BNB after trade')
+                        'The buy/sell boundary is lower than the $ to keep in BNB after trade')
                     count = 0
-                    QCoreApplication.processEvents()
-                    while self.__abort != True:
-                        QCoreApplication.processEvents()
-                        pass
 
             my_address = str(configfile.my_address)
             my_pk = str(configfile.my_pk)
@@ -307,7 +301,7 @@ class Worker(QObject):
                                 a = 0
                                 all_token_information[token_number - 1] = all_token_information[token_number - 1] + (a,)
                     # its now: for token_number,eth_address,high,low,activate,stoploss_value,stoploss_activate,trade_with_ERC,trade_with_ETH,fast_token,small_case_name,decimals,balance in all_token_information:
-
+                # Written by Aviddot: https://github.com/aviddot/Pancakeswap-v2-trading-bot
                 except Exception as e:
                     exception_type, exception_object, exception_traceback = sys.exc_info()
                     if configfile.debugmode == '1':
@@ -451,6 +445,7 @@ class Worker(QObject):
                         'totalbalancedollarscript': totalbalancedollarscript,
                         'dollarbalancemaintoken': dollarbalancemaintoken, 'maintokenbalance': maintokenbalance}
 
+            # Written by Aviddot: https://github.com/aviddot/Pancakeswap-v2-trading-bot
             QCoreApplication.processEvents()
             if 'step' not in locals():
                 step = 1
@@ -474,7 +469,8 @@ class Worker(QObject):
                     if (dollarbalancemaintoken > mcotoseeassell):
                         gelukt = "sell"
                     else:
-                        if dollar_balance > mcotoseeassell:
+                        lol543 = dollar_balance * 100000000000
+                        if lol543 > mcotoseeassell:
                             gelukt = "buy " + small_case_name
                     keer = 0
                     if 'gelukt' not in locals():
@@ -510,7 +506,7 @@ class Worker(QObject):
                 count = 0
                 try:
                     QCoreApplication.processEvents()
-
+                    # Written by Aviddot: https://github.com/aviddot/Pancakeswap-v2-trading-bot
                     while count < timesleep:
                         count = count + 1
                         QtTest.QTest.qWait(1000)
@@ -679,7 +675,7 @@ class Worker(QObject):
                             dollarbalancetoken1 = 0
                             all_token_information[token_number - 1] = all_token_information[token_number - 1][:13] + (
                             pricetoken1usd, dollarbalancetoken1)
-
+                    # Written by Aviddot: https://github.com/aviddot/Pancakeswap-v2-trading-bot
                     weergave = ''
 
                     for token_number, eth_address, high, low, activate, stoploss_value, stoploss_activate, trade_with_ERC, \
@@ -750,6 +746,7 @@ class Worker(QObject):
                             data = int(res.json()[speed] / 10)
                             return data
 
+                        # Written by Aviddot: https://github.com/aviddot/Pancakeswap-v2-trading-bot
                         print(
                             'Current gwei chosen for trading:' + configfile.maxgweinumber + '.   Current BNB price:$' + str(
                                 int(float(
@@ -806,7 +803,7 @@ class Worker(QObject):
                                 print(str(e) + ' on line: ' + str(exception_traceback.tb_lineno))
                         tradeamount = int((ethamount2 / 1.000000001) * 10 ** selldecimals)
                         if len(str(tradeamount)) > 2:
-                            tradeamount = int(str(tradeamount)[:-2] + '00')
+                            tradeamount = int(str(tradeamount)[:-4] + '0000')
                         if tradeamount < 0:
                             tradeamount = int(1)
 
@@ -973,7 +970,7 @@ class Worker(QObject):
                                             print("Trading " + str(small_case_name) + ' ($' + str(
                                                 price) + ') for ' + str(small_case_name2) + " ($" + str(
                                                 price2) + ")")
-
+                                            # Written by Aviddot: https://github.com/aviddot/Pancakeswap-v2-trading-bot
                                             kaka = makeTrade(buytokenaddress=eth_address2, selltokenaddress=eth_address,
                                                              my_address=my_address,
                                                              pk=my_pk, max_slippage=max_slippage, infura_url=infura_url,
@@ -1100,7 +1097,7 @@ class Worker(QObject):
                         trade_with_ETH, fast_token, small_case_name, decimals, balance, price, dollar_balance in all_token_information:
                         if (eth_address == '0' or '') or activate == 0:
                             keer543 += 1
-
+                    # Written by Aviddot: https://github.com/aviddot/Pancakeswap-v2-trading-bot
                     if keer543 == 10:
                         print(
                             'Please stop the application and add at least token1, otherwise the application will do nothing. Don\'t worry, adding a token and activating it will only price check, and not trade :)')
@@ -1303,7 +1300,7 @@ class Worker(QObject):
                                     print(str(strftime("%H:%M:%S",
                                                        localtime())) + weergave + "  Current total balance($): $" + str(
                                         "{:.2f}".format(totaldollars2)))
-
+                        # Written by Aviddot: https://github.com/aviddot/Pancakeswap-v2-trading-bot
                         except Exception as e:
                             exception_type, exception_object, exception_traceback = sys.exc_info()
                             if configfile.debugmode == '1':
@@ -1421,6 +1418,7 @@ class Worker(QObject):
                 self.sig_msg.emit('Worker #{} aborting work at step {}'.format(self.__id, step))
             self.sig_done.emit(self.__id)
 
+    # Written by Aviddot: https://github.com/aviddot/Pancakeswap-v2-trading-bot
     def abort(self):
         self.sig_msg.emit('Worker #{} notified to abort'.format(self.__id))
         self.__abort = True
@@ -3860,7 +3858,7 @@ class Ui_MainWindow(QGraphicsObject):
     def on_worker_step(self, worker_id: int, data: str):
         self.log.append('Worker #{}: {}'.format(worker_id, data))
         self.progress.append('{}: {}'.format(worker_id, data))
-# Written by Aviddot: https://github.com/aviddot/Pancakeswap-v2-trading-bot
+
     @pyqtSlot(int)
     def on_worker_done(self, worker_id):
         self.log.append('worker #{} done'.format(worker_id))
@@ -4001,7 +3999,7 @@ class Ui_MainWindow(QGraphicsObject):
                 self.token9ethaddress.setEnabled(True)
                 self.token9low.setEnabled(True)
                 self.token9high.setEnabled(True)
-                # Written by Aviddot: https://github.com/aviddot/Pancakeswap-v2-trading-bot
+
                 self.activatetoken10.setEnabled(True)
                 self.tradewithETHtoken10.setEnabled(True)
                 self.tradewithERCtoken10.setEnabled(True)
@@ -4059,7 +4057,7 @@ class Ui_MainWindow(QGraphicsObject):
 
         print('Bot stopped')
         lol2()
-       
+
 
 if __name__ == "__main__":
     app = QtWidgets.QApplication(sys.argv)
@@ -4074,4 +4072,3 @@ if __name__ == "__main__":
         if configfile.debugmode == '1':
             print(str(e) + ' on line: ' + str(exception_traceback.tb_lineno))
     print(lollol2)
-# Written by Aviddot: https://github.com/aviddot/Pancakeswap-v2-trading-bot
