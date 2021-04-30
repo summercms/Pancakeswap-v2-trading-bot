@@ -633,7 +633,6 @@ class Worker(QObject):
                         # note that "step" value will not necessarily be same for every thread
                         self.sig_msg.emit('Worker #{} aborting work at step {}'.format(self.__id, step))
 
-                    priceright = 'buy'
                     for token_number, eth_address, high, low, activate, stoploss_value, stoploss_activate, trade_with_ERC, \
                         trade_with_ETH, fast_token, small_case_name, decimals, balance, price, dollar_balance in all_token_information:
                         if eth_address != '0':
