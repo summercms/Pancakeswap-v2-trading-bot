@@ -99,6 +99,7 @@ my_pk = ''</pre>
 <H2>To do</H2>
 
 - Let the amount of decimals and the token-name be derived automatically (like in the uniswap-bot)
+- Add pcs v1 support
 - New, more user-friendly design
 - Fix "Python int too large to convert to C ssize_"
 
