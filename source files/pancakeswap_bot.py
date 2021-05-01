@@ -681,7 +681,7 @@ class Worker(QObject):
                     for token_number, eth_address, high, low, activate, stoploss_value, stoploss_activate, trade_with_ERC, \
                         trade_with_ETH, fast_token, small_case_name, decimals, balance, price, dollar_balance in all_token_information:
                         if eth_address != '0' and activate == 1:
-                            weergave += ('   [' + small_case_name + '  ' + str("{:.6f}".format(price)) + ']')
+                            weergave += ('   [' + small_case_name + '  ' + str("{:.8f}".format(price)) + ']')
                     QCoreApplication.processEvents()
                     if 'step' not in locals():
                         step = 1
