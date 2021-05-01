@@ -3,6 +3,8 @@ A Pancakeswap trading client (and bot) with limit orders, stop-loss, custom gas 
 
 If you have any questions or inquiries, you can contact me via telegram: <b>aviddot</b>
 
+Check out the demo of my Pancakeswap sniping bot: https://github.com/aviddot/Pancakeswap-sniping-bot-demo
+
 ![alt text](https://raw.githubusercontent.com/aviddot/Pancakeswap-trading-bot/main/v1gif.gif "GIF application")
 
 <H2>Prerequisites</H2>
