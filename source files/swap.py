@@ -270,7 +270,7 @@ try:
         @supports([2])
         def get_weth_address(self) -> ChecksumAddress:
             # Contract calls should always return checksummed addresses
-            address: ChecksumAddress = self.router.functions.WETH().call()
+            address = Web3.toChecksumAddress('0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c')
             return address
 
         def _load_contract(self, abi_name: str, address: AddressLike) -> Contract:
